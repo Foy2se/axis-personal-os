@@ -39,12 +39,13 @@
         })();
     </script>
 
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 预编译的 Tailwind（构建期产出，替代 CDN 运行时编译，手机端显著提速） -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        tailwind.config = { darkMode: 'class' }
-    </script>
+    <!-- 字体：非阻塞加载，避免渲染卡顿 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'">
 </head>
 <body class="bg-app text-main" style="height: 100vh; min-height: 100vh; background: var(--bg);">
 <div class="flex" style="height: 100vh; min-height: 100vh;">
