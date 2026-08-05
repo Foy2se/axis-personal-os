@@ -1709,15 +1709,13 @@ def automation():
 
 @app.route('/automation/export-ics')
 def automation_export_ics():
-    """导出ICS日历文件 - iOS Safari 兼容方案
+    """导出 ICS 日历文件
 
-    关键点：
-    1. Content-Type: text/calendar; charset=utf-8（charset 只出现一次）
-    2. 行尾使用 CRLF（RFC 5545 标准），generate_ics() 已直接输出 CRLF
-    3. Content-Disposition 使用 inline 而非 attachment
-       iOS Safari 对 inline 的 text/calendar 会弹出日历预览/导入对话框
-       attachment 在 iframe/PWA 内会被 Safari 拒绝下载
-    4. Content-Length 头部确保 Safari 正确处理响应体
+    关键修复：改用 attachment + application/octet-stream，
+    避免 iOS（尤其 PWA「添加到主屏幕」独立模式）弹出关不掉的
+    “添加事件或日历”系统对话框。
+    - iOS Safari 会将其作为文件下载到「文件」App，用户可手动打开 .ics 添加到日历
+    - 桌面 / Android 浏览器直接下载，行为正常
     """
     ics_content = generate_ics()
     # generate_ics() 已使用 CRLF，此处做双保险：标准化 LF → CRLF
@@ -1726,15 +1724,13 @@ def automation_export_ics():
 
     resp = Response(
         ics_bytes,
-        mimetype='text/calendar',
+        mimetype='application/octet-stream',
         headers={
-            'Content-Disposition': 'inline; filename="AXIS_Calendar.ics"',
+            'Content-Disposition': 'attachment; filename="AXIS_Calendar.ics"',
             'Content-Length': str(len(ics_bytes)),
             'Cache-Control': 'no-cache, no-store, must-revalidate',
         }
     )
-    # 直接覆盖 Content-Type，避免 Flask 自动附加重复的 charset
-    resp.headers['Content-Type'] = 'text/calendar; charset=utf-8'
     return resp
 
 
