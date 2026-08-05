@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+{% block title %}周期事项 - Personal OS{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <h1 class="text-2xl font-bold text-main">🔄 周期事项管理</h1>
+        <button onclick="openModal('modal-cycle')" class="btn btn-primary">+ 添加周期事项</button>
+    </div>
+
+    <div class="bg-blue-50 rounded-xl p-4 border border-blue-100 text-xs text-blue-700">
+        🔄 管理所有重复发生的事情：宠物驱虫、家庭清洁、设备维护、健康事项、证件更新等。<br>
+        💡 每个事项可自主设置周期（如90天、3个月、1年等），系统自动计算下次日期。
+    </div>
+
+    <!-- 事项列表 -->
+    <div class="space-y-3">
+        {% for c in cycles %}
+        <div class="bg-card rounded-xl border border-app p-4 card
+            {% if c.is_overdue %}border-l-4 border-l-red-500{% elif c.is_due_soon %}border-l-4 border-l-orange-500{% endif %}">
+            <div class="flex items-start justify-between gap-3 flex-wrap">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <h3 class="font-semibold text-main">{{ c['name'] }}</h3>
+                        <span class="text-xs px-1.5 py-0.5 rounded
+                            {% if c['category'] == '宠物' %}bg-pink-100 text-pink-600
+                            {% elif c['category'] == '健康' %}bg-red-100 text-red-600
+                            {% elif c['category'] == '家庭' %}bg-green-100 text-green-600
+                            {% else %}bg-slate-100 text-sub{% endif %}">{{ c['category'] }}</span>
+                        {% if c.is_overdue %}
+                        <span class="text-xs px-2 py-0.5 rounded bg-red-500 text-white">已逾期 {{ c.days_until|abs }} 天</span>
+                        {% elif c.is_due_soon %}
+                        <span class="text-xs px-2 py-0.5 rounded bg-orange-500 text-white">{{ c.days_until }} 天后到期</span>
+                        {% else %}
+                        <span class="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-600">{{ c.days_until }} 天后</span>
+                        {% endif %}
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 text-xs text-sub">
+                        <div>最近完成: <span class="text-main">{{ c['last_done_date'] }}</span></div>
+                        <div>周期: <span class="text-main">{{ c['cycle_number'] }} {{ c['cycle_unit'] }}</span></div>
+                        <div>下次: <span class="text-main font-medium">{{ c['next_date'] }}</span></div>
+                        <div>提前提醒: <span class="text-main">{{ c['advance_remind'] }}</span></div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <form method="POST" action="{{ url_for('life_cycle_complete', cid=c['id']) }}" class="inline">
+                        <input type="hidden" name="done_date" value="{{ today }}">
+                        <button type="submit" class="btn btn-primary text-xs" onclick="return confirm('确认已完成「{{ c['name'] }}」？将自动更新下次日期。')">✓ 标记完成</button>
+                    </form>
+                    <button onclick='editCycle({{ c['id']|tojson }}, {{ c['name']|tojson }}, {{ c['category']|tojson }}, {{ c['last_done_date']|tojson }}, {{ c['cycle_number']|tojson }}, {{ c['cycle_unit']|tojson }}, {{ c['advance_remind']|tojson }})' class="text-xs text-primary hover:underline">编辑</button>
+                    <form method="POST" action="{{ url_for('life_cycle_delete', cid=c['id']) }}" class="inline" onsubmit="return confirmDelete('确定删除此周期事项？')">
+                        <button type="submit" class="text-xs text-red-500 hover:underline">删除</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-12">暂无周期事项，添加你的第一个重复事项</div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- 添加周期事项模态框 -->
+<div id="modal-cycle" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">添加周期事项</h3>
+            <button onclick="closeModal('modal-cycle')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('life_cycle_add') }}" class="space-y-3">
+            <div>
+                <label class="form-label">事项名称</label>
+                <input type="text" name="name" required class="form-input" placeholder="如：宠物驱虫">
+            </div>
+            <div>
+                <label class="form-label">分类</label>
+                <div class="flex gap-2">
+                    <input type="text" name="category" id="input-category" class="form-input flex-1" placeholder="输入分类名称" list="category-list" value="其他">
+                    <datalist id="category-list">
+                        {% for cat in existing_categories %}
+                        <option value="{{ cat }}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+                <div class="flex flex-wrap gap-1.5 mt-2">
+                    {% for cat in existing_categories %}
+                    <button type="button" onclick="document.getElementById('input-category').value='{{ cat }}'" class="text-xs px-2 py-1 rounded-full bg-hover text-sub hover:bg-primary hover:text-white transition">{{ cat }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+            <div>
+                <label class="form-label">最近完成日期</label>
+                <input type="date" name="last_done_date" required class="form-input" value="{{ today }}">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">周期数字</label>
+                    <input type="number" name="cycle_number" required min="1" value="90" class="form-input" placeholder="如：90">
+                </div>
+                <div>
+                    <label class="form-label">周期单位</label>
+                    <select name="cycle_unit" class="form-input">
+                        <option>天</option><option>周</option><option>月</option><option>年</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="form-label">提前提醒</label>
+                <select name="advance_remind" class="form-input">
+                    <option value="0天">当天提醒</option>
+                    <option value="1天">提前1天</option>
+                    <option value="3天" selected>提前3天</option>
+                    <option value="7天">提前7天</option>
+                    <option value="30天">提前30天</option>
+                </select>
+            </div>
+            <div class="bg-hover rounded-lg p-3 text-xs text-sub">
+                💡 系统将根据最近完成日期和周期自动计算下次日期
+            </div>
+            <button type="submit" class="btn btn-primary w-full">添加事项</button>
+        </form>
+    </div>
+</div>
+
+<!-- 编辑周期事项模态框 -->
+<div id="modal-edit-cycle" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">编辑周期事项</h3>
+            <button onclick="closeModal('modal-edit-cycle')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form id="form-edit-cycle" method="POST" action="" class="space-y-3">
+            <div>
+                <label class="form-label">事项名称</label>
+                <input type="text" name="name" id="ec-name" required class="form-input">
+            </div>
+            <div>
+                <label class="form-label">分类</label>
+                <div class="flex gap-2">
+                    <input type="text" name="category" id="ec-category" class="form-input flex-1" placeholder="输入分类名称" list="category-list">
+                    <datalist id="category-list-edit">
+                        {% for cat in existing_categories %}
+                        <option value="{{ cat }}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+            </div>
+            <div>
+                <label class="form-label">最近完成日期</label>
+                <input type="date" name="last_done_date" id="ec-lastdone" required class="form-input">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">周期数字</label>
+                    <input type="number" name="cycle_number" id="ec-num" required min="1" class="form-input">
+                </div>
+                <div>
+                    <label class="form-label">周期单位</label>
+                    <select name="cycle_unit" id="ec-unit" class="form-input">
+                        <option>天</option><option>周</option><option>月</option><option>年</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="form-label">提前提醒</label>
+                <select name="advance_remind" id="ec-advance" class="form-input">
+                    <option value="1天">提前1天</option>
+                    <option value="3天">提前3天</option>
+                    <option value="7天">提前7天</option>
+                    <option value="30天">提前30天</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary w-full">保存修改</button>
+        </form>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function editCycle(id, name, category, lastDone, num, unit, advance) {
+    document.getElementById('form-edit-cycle').action = '/life-cycle/' + id + '/edit';
+    document.getElementById('ec-name').value = name || '';
+    document.getElementById('ec-category').value = category || '其他';
+    document.getElementById('ec-lastdone').value = lastDone || '';
+    document.getElementById('ec-num').value = num || 90;
+    document.getElementById('ec-unit').value = unit || '天';
+    document.getElementById('ec-advance').value = advance || '3天';
+    openModal('modal-edit-cycle');
+}
+</script>
+{% endblock %}
+{% endblock %}

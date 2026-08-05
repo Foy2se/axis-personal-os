@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% block title %}项目管理 - Personal OS{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <h1 class="text-2xl font-bold text-main">📁 项目管理</h1>
+        <button onclick="openModal('modal-project')" class="btn btn-primary">+ 新建项目</button>
+    </div>
+
+    <!-- 阶段说明 -->
+    <div class="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
+        <div class="text-xs text-indigo-600 font-semibold mb-2">项目阶段流程</div>
+        <div class="flex items-center gap-1 flex-wrap text-xs">
+            {% for stage in ['研究阶段', '策略阶段', '创意阶段', '设计阶段', '输出阶段', '复盘阶段'] %}
+            <span class="px-2 py-1 rounded bg-card text-sub border border-indigo-100">{{ stage }}</span>
+            {% if not loop.last %}<span class="text-indigo-300">→</span>{% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- 项目列表 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {% for p in projects %}
+        <div class="bg-card rounded-xl border border-app p-5 card">
+            <div class="flex items-start justify-between mb-3">
+                <div>
+                    <h3 class="font-semibold text-main">{{ p['name'] }}</h3>
+                    {% if p['objective'] %}
+                    <p class="text-xs text-sub mt-1">{{ p['objective'] }}</p>
+                    {% endif %}
+                </div>
+                <form method="POST" action="{{ url_for('project_delete', pid=p['id']) }}" class="inline" onsubmit="return confirmDelete('确定删除项目「{{ p['name'] }}」？关联的工作日志将取消关联。')">
+                    <button type="submit" class="text-xs text-red-500 hover:underline">删除</button>
+                </form>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-xs text-sub mb-3">
+                <div>开始: {{ p['start_date'] or '-' }}</div>
+                <div>结束: {{ p['end_date'] or '-' }}</div>
+                <div>日志: {{ p['log_count'] }} 篇</div>
+                <div>复盘: {{ '已完成' if p['review'] else '未进行' }}</div>
+            </div>
+
+            <form method="POST" action="{{ url_for('project_update', pid=p['id']) }}" class="flex items-center gap-2 mb-3">
+                <select name="stage" onchange="this.form.submit()" class="text-xs rounded border border-app px-2 py-1 flex-1">
+                    {% for stage in ['研究阶段', '策略阶段', '创意阶段', '设计阶段', '输出阶段', '复盘阶段'] %}
+                    <option value="{{ stage }}" {{ 'selected' if p['stage'] == stage }}>{{ stage }}</option>
+                    {% endfor %}
+                </select>
+                <button onclick="editProject({{ p['id'] }}, '{{ p['name']|e }}', '{{ p['objective']|e }}', '{{ p['start_date'] or '' }}', '{{ p['end_date'] or '' }}', '{{ p['stage'] }}')" type="button" class="text-xs text-primary hover:underline">编辑</button>
+            </form>
+
+            <div class="flex items-center gap-2">
+                <a href="{{ url_for('project_review', pid=p['id']) }}" class="btn btn-secondary text-xs flex-1 text-center">📋 项目复盘</a>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-span-2 text-center text-muted py-12">暂无项目，点击右上角新建</div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- 新建项目模态框 -->
+<div id="modal-project" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">新建项目</h3>
+            <button onclick="closeModal('modal-project')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('project_add') }}" class="space-y-3">
+            <div>
+                <label class="form-label">项目名称</label>
+                <input type="text" name="name" required class="form-input" placeholder="项目名称">
+            </div>
+            <div>
+                <label class="form-label">项目目标</label>
+                <textarea name="objective" rows="2" class="form-input" placeholder="这个项目要实现什么..."></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">开始日期</label>
+                    <input type="date" name="start_date" class="form-input">
+                </div>
+                <div>
+                    <label class="form-label">结束日期</label>
+                    <input type="date" name="end_date" class="form-input">
+                </div>
+            </div>
+            <div>
+                <label class="form-label">当前阶段</label>
+                <select name="stage" class="form-input">
+                    {% for stage in ['研究阶段', '策略阶段', '创意阶段', '设计阶段', '输出阶段', '复盘阶段'] %}
+                    <option value="{{ stage }}">{{ stage }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary w-full">创建项目</button>
+        </form>
+    </div>
+</div>
+
+<!-- 编辑项目模态框 -->
+<div id="modal-edit-project" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">编辑项目</h3>
+            <button onclick="closeModal('modal-edit-project')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form id="form-edit-project" method="POST" action="" class="space-y-3">
+            <div>
+                <label class="form-label">项目名称</label>
+                <input type="text" name="name" id="ep-name" required class="form-input">
+            </div>
+            <div>
+                <label class="form-label">项目目标</label>
+                <textarea name="objective" id="ep-obj" rows="2" class="form-input"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">开始日期</label>
+                    <input type="date" name="start_date" id="ep-start" class="form-input">
+                </div>
+                <div>
+                    <label class="form-label">结束日期</label>
+                    <input type="date" name="end_date" id="ep-end" class="form-input">
+                </div>
+            </div>
+            <div>
+                <label class="form-label">当前阶段</label>
+                <select name="stage" id="ep-stage" class="form-input">
+                    {% for stage in ['研究阶段', '策略阶段', '创意阶段', '设计阶段', '输出阶段', '复盘阶段'] %}
+                    <option value="{{ stage }}">{{ stage }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary w-full">保存修改</button>
+        </form>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function editProject(id, name, obj, start, end, stage) {
+    document.getElementById('form-edit-project').action = '/projects/' + id + '/update';
+    document.getElementById('ep-name').value = name;
+    document.getElementById('ep-obj').value = obj;
+    document.getElementById('ep-start').value = start;
+    document.getElementById('ep-end').value = end;
+    document.getElementById('ep-stage').value = stage;
+    openModal('modal-edit-project');
+}
+</script>
+{% endblock %}
+{% endblock %}

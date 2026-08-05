@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% block title %}阅读计划 - Personal OS{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <h1 class="text-2xl font-bold text-main">📚 阅读计划</h1>
+        <button onclick="openModal('modal-book')" class="btn btn-primary">+ 添加书籍</button>
+    </div>
+
+    <div class="flex bg-card rounded-lg border border-app overflow-hidden">
+        <a href="{{ url_for('reading') }}" class="px-3 py-1.5 text-sm {{ 'bg-primary text-white' if not current_status else 'text-sub' }}">全部</a>
+        <a href="{{ url_for('reading', status='未开始') }}" class="px-3 py-1.5 text-sm {{ 'bg-primary text-white' if current_status == '未开始' else 'text-sub' }}">未开始</a>
+        <a href="{{ url_for('reading', status='阅读中') }}" class="px-3 py-1.5 text-sm {{ 'bg-primary text-white' if current_status == '阅读中' else 'text-sub' }}">阅读中</a>
+        <a href="{{ url_for('reading', status='已完成') }}" class="px-3 py-1.5 text-sm {{ 'bg-primary text-white' if current_status == '已完成' else 'text-sub' }}">已完成</a>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {% for b in books %}
+        <div class="bg-card rounded-xl border border-app p-4 card">
+            <div class="flex items-start justify-between mb-2">
+                <div>
+                    <h3 class="font-semibold text-main">{{ b['book_name'] }}</h3>
+                    {% if b['author'] %}<p class="text-xs text-sub">{{ b['author'] }}</p>{% endif %}
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick='editBook({{ b['id']|tojson }}, {{ b['book_name']|tojson }}, {{ b['author']|tojson }}, {{ b['purchase_status']|tojson }}, {{ b['reading_status']|tojson }}, {{ b['reading_goal']|tojson }}, {{ b['notes']|tojson }})' class="text-xs text-primary hover:underline">编辑</button>
+                    <form method="POST" action="{{ url_for('reading_delete', rid=b['id']) }}" class="inline" onsubmit="return confirmDelete('确定删除？')">
+                        <button type="submit" class="text-xs text-red-500 hover:underline">删除</button>
+                    </form>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 mb-2">
+                <span class="text-xs px-1.5 py-0.5 rounded
+                    {% if b['reading_status'] == '未开始' %}bg-slate-100 text-sub
+                    {% elif b['reading_status'] == '阅读中' %}bg-blue-100 text-blue-600
+                    {% else %}bg-green-100 text-green-600{% endif %}">{{ b['reading_status'] }}</span>
+                <span class="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-sub">{{ b['purchase_status'] }}</span>
+            </div>
+            {% if b['reading_goal'] %}<p class="text-xs text-sub mb-1">目标: {{ b['reading_goal'] }}</p>{% endif %}
+            {% if b['notes'] %}<p class="text-xs text-sub whitespace-pre-wrap">{{ b['notes'] }}</p>{% endif %}
+        </div>
+        {% else %}
+        <div class="col-span-2 text-center text-muted py-12">暂无书籍</div>
+        {% endfor %}
+    </div>
+</div>
+
+<div id="modal-book" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">添加书籍</h3>
+            <button onclick="closeModal('modal-book')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('reading_add') }}" class="space-y-3">
+            <div>
+                <label class="form-label">书名</label>
+                <input type="text" name="book_name" required class="form-input">
+            </div>
+            <div>
+                <label class="form-label">作者</label>
+                <input type="text" name="author" class="form-input">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">购买状态</label>
+                    <select name="purchase_status" class="form-input">
+                        <option>未购买</option><option>已购买</option><option>电子书</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">阅读状态</label>
+                    <select name="reading_status" class="form-input">
+                        <option>未开始</option><option>阅读中</option><option>已完成</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="form-label">阅读目标</label>
+                <input type="text" name="reading_goal" class="form-input" placeholder="如：2周内读完">
+            </div>
+            <div>
+                <label class="form-label">阅读笔记</label>
+                <textarea name="notes" rows="3" class="form-input"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary w-full">添加</button>
+        </form>
+    </div>
+</div>
+
+<div id="modal-edit-book" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">编辑书籍</h3>
+            <button onclick="closeModal('modal-edit-book')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form id="form-edit-book" method="POST" action="" class="space-y-3">
+            <div>
+                <label class="form-label">书名</label>
+                <input type="text" name="book_name" id="eb-name" required class="form-input">
+            </div>
+            <div>
+                <label class="form-label">作者</label>
+                <input type="text" name="author" id="eb-author" class="form-input">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">购买状态</label>
+                    <select name="purchase_status" id="eb-purchase" class="form-input">
+                        <option>未购买</option><option>已购买</option><option>电子书</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">阅读状态</label>
+                    <select name="reading_status" id="eb-status" class="form-input">
+                        <option>未开始</option><option>阅读中</option><option>已完成</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="form-label">阅读目标</label>
+                <input type="text" name="reading_goal" id="eb-goal" class="form-input">
+            </div>
+            <div>
+                <label class="form-label">阅读笔记</label>
+                <textarea name="notes" id="eb-notes" rows="3" class="form-input"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary w-full">保存修改</button>
+        </form>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function editBook(id, name, author, purchase, status, goal, notes) {
+    document.getElementById('form-edit-book').action = '/reading/' + id + '/update';
+    document.getElementById('eb-name').value = name || '';
+    document.getElementById('eb-author').value = author || '';
+    document.getElementById('eb-purchase').value = purchase || '未购买';
+    document.getElementById('eb-status').value = status || '未开始';
+    document.getElementById('eb-goal').value = goal || '';
+    document.getElementById('eb-notes').value = notes || '';
+    openModal('modal-edit-book');
+}
+</script>
+{% endblock %}
+{% endblock %}

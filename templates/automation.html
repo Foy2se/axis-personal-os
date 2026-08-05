@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block title %}自动化提醒 - Personal OS{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+            <h1 class="text-2xl font-bold text-main">🔔 自动化提醒中心</h1>
+            <p class="text-sm text-sub mt-1">当前时间: {{ current_time }}</p>
+        </div>
+        <a href="{{ url_for('automation_export_ics') }}" class="btn btn-primary" download="AXIS_Calendar.ics" target="_blank" id="export-ics-btn">📥 导出 ICS 日历文件</a>
+    </div>
+
+    <!-- ICS 说明 -->
+    <div class="bg-green-50 rounded-xl p-4 border border-green-100 text-xs text-green-700">
+        📥 点击「导出 ICS 日历文件」可下载日历文件，导入到手机/电脑日历 App（如 Apple 日历、Google 日历）即可实现系统级推送提醒。
+    </div>
+
+    <!-- 提醒列表 -->
+    <div class="space-y-3">
+        {% for r in reminders %}
+        <div class="bg-card rounded-xl border border-app p-5 card {{ 'reminder-active' if r.active else '' }}">
+            <div class="flex items-start justify-between gap-3 flex-wrap">
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 flex-wrap mb-2">
+                        <h3 class="font-semibold text-main">{{ r.title }}</h3>
+                        {% if r.active %}
+                        <span class="text-xs px-2 py-0.5 rounded bg-green-500 text-white animate-pulse">进行中</span>
+                        {% else %}
+                        <span class="text-xs px-2 py-0.5 rounded bg-slate-100 text-sub">{{ r.scheduled }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="text-xs text-muted mb-2">⏰ {{ r.time_range }}</div>
+                    <p class="text-sm text-sub">{{ r.description }}</p>
+                </div>
+                <a href="{{ r.action_url }}" class="btn {{ 'btn-primary' if r.active else 'btn-secondary' }} text-sm flex-shrink-0">{{ r.action_text }}</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- 提醒规则说明 -->
+    <div class="bg-card rounded-xl border border-app p-5">
+        <h2 class="font-semibold text-main mb-3">📋 提醒规则</h2>
+        <div class="space-y-3 text-sm">
+            <div class="flex items-start gap-3">
+                <span class="text-xs font-mono bg-indigo-100 text-indigo-600 px-2 py-1 rounded">09:00-09:30</span>
+                <div class="flex-1">
+                    <div class="font-medium text-main">开始今日规划</div>
+                    <div class="text-xs text-sub">打开今日任务页面，填写今天最重要的三件事</div>
+                </div>
+            </div>
+            <div class="flex items-start gap-3">
+                <span class="text-xs font-mono bg-green-100 text-green-600 px-2 py-1 rounded">18:50-20:00</span>
+                <div class="flex-1">
+                    <div class="font-medium text-main">完成今日工作记录</div>
+                    <div class="text-xs text-sub">填写：今天完成 / 今天问题 / 明日重点</div>
+                </div>
+            </div>
+            <div class="flex items-start gap-3">
+                <span class="text-xs font-mono bg-indigo-100 text-indigo-600 px-2 py-1 rounded">19:00-21:00</span>
+                <div class="flex-1">
+                    <div class="font-medium text-main">规划今晚个人时间</div>
+                    <div class="text-xs text-sub">工作日志完成后引导 → 今晚计划（工作延续 / 学习成长 / 生活事项 / 兴趣娱乐）</div>
+                </div>
+            </div>
+            <div class="flex items-start gap-3">
+                <span class="text-xs font-mono bg-pink-100 text-pink-600 px-2 py-1 rounded">22:00-23:30</span>
+                <div class="flex-1">
+                    <div class="font-medium text-main">睡前确认今晚计划</div>
+                    <div class="text-xs text-sub">回顾完成情况，未完成项可延后到明天 / 重新安排 / 放弃</div>
+                </div>
+            </div>
+            <div class="flex items-start gap-3">
+                <span class="text-xs font-mono bg-purple-100 text-purple-600 px-2 py-1 rounded">每周日</span>
+                <div class="flex-1">
+                    <div class="font-medium text-main">完成周复盘</div>
+                    <div class="text-xs text-sub">本周完成 / 未完成事项 / 问题 / 调整方向</div>
+                </div>
+            </div>
+            <div class="flex items-start gap-3">
+                <span class="text-xs font-mono bg-orange-100 text-orange-600 px-2 py-1 rounded">每月1号</span>
+                <div class="flex-1">
+                    <div class="font-medium text-main">完成月度规划</div>
+                    <div class="text-xs text-sub">目标规划 / 阅读计划 / 消费规划 / 生活计划</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ICS 导出：使用 window.open 打开新标签页，避免替换当前 PWA 页面
+// iOS Safari 对 inline text/calendar 会在新标签弹出日历预览/导入对话框
+document.getElementById('export-ics-btn').addEventListener('click', function(e) {
+    e.preventDefault();
+    var url = this.href;
+    // 无论是否在 iframe 内，都用 window.open 打开新标签页
+    // 这样不会离开当前 PWA 页面，用户完成导入后可返回
+    window.open(url, '_blank');
+});
+</script>
+{% endblock %}

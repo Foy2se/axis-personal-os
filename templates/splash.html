@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN" {% if request.args.get('pwa') == '1' %}data-pwa{% endif %}>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>AXIS</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="AXIS">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="manifest" href="{{ request.url_root.rstrip('/') }}{{ url_for('manifest') }}">
+    <link rel="apple-touch-icon" sizes="120x120" href="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='icons/axis-touch-120.png') }}">
+    <link rel="apple-touch-icon" sizes="167x167" href="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='icons/axis-touch-167.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='icons/axis-touch-180.png') }}">
+    <link rel="apple-touch-icon-precomposed" sizes="180x180" href="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='icons/axis-touch-180.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='icons/favicon.png') }}">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%;
+            height: 100%;
+            background: #0f172a;
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+        }
+        .splash-container {
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+            position: relative;
+            background: #0f172a;
+        }
+        .splash-bg {
+            position: absolute;
+            inset: 0;
+            background-image: url("{{ url_for('static', filename='icons/axis-splash.jpg') }}");
+            background-size: cover;
+            background-position: center top;
+            background-repeat: no-repeat;
+            z-index: 1;
+        }
+        .enter-btn {
+            position: absolute;
+            left: 50%;
+            bottom: max(12%, calc(100px + env(safe-area-inset-bottom)));
+            transform: translateX(-50%);
+            z-index: 2;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.9rem 2.2rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 500;
+            text-decoration: none;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+            transition: all 0.3s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .enter-btn:hover {
+            background: rgba(255, 255, 255, 0.18);
+            transform: translateX(-50%) translateY(-1px);
+        }
+        .enter-btn:active {
+            transform: translateX(-50%) scale(0.97);
+        }
+    </style>
+</head>
+<body>
+    <div class="splash-container">
+        <div class="splash-bg"></div>
+        <a href="{{ url_for('dashboard') }}{% if request.args.get('pwa') == '1' %}?pwa=1{% endif %}" class="enter-btn">进入系统 →</a>
+    </div>
+</body>
+</html>

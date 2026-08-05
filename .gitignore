@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+venv/
+env/
+.venv/
+
+# Environment / secrets
+.env
+.env.*
+*.local
+
+# Database (runtime data, not source)
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# Logs
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# WorkBuddy internal memory (keep out of repo)
+.workbuddy/

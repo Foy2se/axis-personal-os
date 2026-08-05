@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block title %}月度计划 - Personal OS{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <h1 class="text-2xl font-bold text-main">📋 月度计划</h1>
+        <!-- 月份选择 -->
+        <div class="flex items-center gap-2">
+            <input type="month" id="month-picker" value="{{ year_month }}" onchange="window.location.href='{{ url_for('monthly_plan') }}?ym=' + this.value" class="form-input">
+        </div>
+    </div>
+
+    <!-- 历史月份 -->
+    {% if all_plans %}
+    <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-xs text-muted">已有记录：</span>
+        {% for p in all_plans[:6] %}
+        <a href="{{ url_for('monthly_plan', ym=p['year_month']) }}" class="text-xs px-2 py-1 rounded {{ 'bg-primary text-white' if p['year_month'] == year_month else 'bg-slate-100 text-sub hover:bg-hover' }}">{{ p['year_month'] }}</a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- 月度计划表单 -->
+    <div class="bg-card rounded-xl border border-app p-5">
+        <form method="POST" action="{{ url_for('monthly_plan_save') }}" class="space-y-4">
+            <input type="hidden" name="year_month" value="{{ year_month }}">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="form-label">💼 工作目标</label>
+                    <textarea name="work_goal" rows="3" class="form-input" placeholder="本月工作要达成什么...">{{ plan['work_goal'] if plan else '' }}</textarea>
+                </div>
+                <div>
+                    <label class="form-label">🎓 学习目标</label>
+                    <textarea name="learning_goal" rows="3" class="form-input" placeholder="本月学习什么...">{{ plan['learning_goal'] if plan else '' }}</textarea>
+                </div>
+                <div>
+                    <label class="form-label">📚 阅读计划</label>
+                    <textarea name="reading_plan" rows="3" class="form-input" placeholder="计划读哪些书...">{{ plan['reading_plan'] if plan else '' }}</textarea>
+                </div>
+                <div>
+                    <label class="form-label">💰 消费计划</label>
+                    <textarea name="expense_plan" rows="3" class="form-input" placeholder="本月预算规划...">{{ plan['expense_plan'] if plan else '' }}</textarea>
+                </div>
+            </div>
+            <div>
+                <label class="form-label">🏠 生活计划</label>
+                <textarea name="life_plan" rows="3" class="form-input" placeholder="生活方面的计划...">{{ plan['life_plan'] if plan else '' }}</textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">保存月度计划</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

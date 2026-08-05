@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block title %}项目复盘 - Personal OS{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+            <a href="{{ url_for('projects') }}" class="text-sm text-muted hover:text-sub mb-1 inline-block">← 返回项目列表</a>
+            <h1 class="text-2xl font-bold text-main">📋 项目复盘：{{ project['name'] }}</h1>
+        </div>
+    </div>
+
+    <!-- 项目信息 -->
+    <div class="bg-card rounded-xl border border-app p-5">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+                <div class="text-xs text-muted">目标</div>
+                <div class="text-main">{{ project['objective'] or '-' }}</div>
+            </div>
+            <div>
+                <div class="text-xs text-muted">阶段</div>
+                <div class="text-main">{{ project['stage'] }}</div>
+            </div>
+            <div>
+                <div class="text-xs text-muted">开始</div>
+                <div class="text-main">{{ project['start_date'] or '-' }}</div>
+            </div>
+            <div>
+                <div class="text-xs text-muted">结束</div>
+                <div class="text-main">{{ project['end_date'] or '-' }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 关联工作日志 -->
+    {% if logs %}
+    <div class="bg-card rounded-xl border border-app p-5">
+        <h2 class="font-semibold text-main mb-3">📝 关联工作日志（{{ logs|length }} 篇）</h2>
+        <div class="space-y-2 max-h-48 overflow-y-auto">
+            {% for log in logs %}
+            <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-hover text-sm">
+                <span class="text-sub text-xs w-24">{{ log['log_date'] }}</span>
+                <span class="text-main flex-1 truncate">{{ log['completed'] or log['tomorrow_focus'] or '无内容' }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 复盘表单 -->
+    <div class="bg-card rounded-xl border border-app p-5">
+        <h2 class="font-semibold text-main mb-4">🔄 复盘记录</h2>
+        <form method="POST" action="{{ url_for('project_review', pid=project['id']) }}" class="space-y-4">
+            <div>
+                <label class="form-label">项目目标</label>
+                <textarea name="objective" rows="2" class="form-input" placeholder="回顾当初设定的目标...">{{ review['objective'] if review else project['objective'] or '' }}</textarea>
+            </div>
+            <div>
+                <label class="form-label">最终结果</label>
+                <textarea name="result" rows="2" class="form-input" placeholder="实际达成了什么...">{{ review['result'] if review else '' }}</textarea>
+            </div>
+            <div>
+                <label class="form-label">完成情况</label>
+                <textarea name="completion" rows="2" class="form-input" placeholder="完成度如何...">{{ review['completion'] if review else '' }}</textarea>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="form-label">做得好的地方</label>
+                    <textarea name="good_points" rows="3" class="form-input" placeholder="哪些做得好...">{{ review['good_points'] if review else '' }}</textarea>
+                </div>
+                <div>
+                    <label class="form-label">不足的地方</label>
+                    <textarea name="bad_points" rows="3" class="form-input" placeholder="哪些不足...">{{ review['bad_points'] if review else '' }}</textarea>
+                </div>
+            </div>
+            <div>
+                <label class="form-label">经验总结</label>
+                <textarea name="experience" rows="3" class="form-input" placeholder="学到了什么...">{{ review['experience'] if review else '' }}</textarea>
+            </div>
+            <div>
+                <label class="form-label">未来优化方式</label>
+                <textarea name="optimization" rows="3" class="form-input" placeholder="下次如何改进...">{{ review['optimization'] if review else '' }}</textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">保存复盘</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

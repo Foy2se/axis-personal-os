@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+{% block title %}Tasks - AXIS{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <h1 class="text-2xl font-bold text-main">✅ Tasks</h1>
+        <button onclick="openModal('modal-task')" class="btn btn-primary">+ 新建任务</button>
+    </div>
+
+    <!-- 分类标签 -->
+    <div class="flex items-center gap-2 flex-wrap">
+        <div class="flex bg-card rounded-lg border border-app overflow-hidden">
+            <a href="{{ url_for('tasks', tab='today') }}" class="px-4 py-1.5 text-sm {{ 'bg-primary text-white' if tab == 'today' else 'text-sub hover:bg-hover' }}">Today</a>
+            <a href="{{ url_for('tasks', tab='upcoming') }}" class="px-4 py-1.5 text-sm {{ 'bg-primary text-white' if tab == 'upcoming' else 'text-sub hover:bg-hover' }}">Upcoming</a>
+            <a href="{{ url_for('tasks', tab='longterm') }}" class="px-4 py-1.5 text-sm {{ 'bg-primary text-white' if tab == 'longterm' else 'text-sub hover:bg-hover' }}">Long-term</a>
+        </div>
+    </div>
+
+    <!-- 任务列表 -->
+    <div class="bg-card rounded-xl border border-app overflow-hidden">
+        {% if tasks %}
+        <table class="w-full">
+            <thead class="bg-hover border-b border-app">
+                <tr>
+                    <th class="text-left px-4 py-2 text-xs font-semibold text-sub">任务名称</th>
+                    <th class="text-left px-4 py-2 text-xs font-semibold text-sub hidden sm:table-cell">Focus</th>
+                    <th class="text-left px-4 py-2 text-xs font-semibold text-sub">优先级</th>
+                    <th class="text-left px-4 py-2 text-xs font-semibold text-sub hidden sm:table-cell">日期</th>
+                    <th class="text-left px-4 py-2 text-xs font-semibold text-sub">状态</th>
+                    <th class="text-right px-4 py-2 text-xs font-semibold text-sub">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in tasks %}
+                <tr class="border-b border-app hover:bg-hover">
+                    <td class="px-4 py-3 text-sm {{ 'line-through text-muted' if t['status'] == '已完成' else 'text-main' }}">
+                        {{ t['name'] }}
+                        {% if t['auto_migrated'] %}<span class="text-[10px] text-orange-500 ml-1">(已迁移)</span>{% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-xs text-sub hidden sm:table-cell">
+                        {% if t['focus_category'] == 'Work' %}<span class="text-indigo-500">工作</span>
+                        {% elif t['focus_category'] == 'Life' %}<span class="text-green-500">生活</span>
+                        {% elif t['focus_category'] == 'Growth' %}<span class="text-purple-500">成长</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="px-4 py-3">
+                        <span class="text-xs px-2 py-0.5 rounded
+                            {% if t['priority'] == '高' %}priority-high{% elif t['priority'] == '中' %}priority-mid{% else %}priority-low{% endif %}">
+                            {{ t['priority'] }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-xs text-sub hidden sm:table-cell">{{ t['scheduled_date'] or t['deadline'] or '-' }}</td>
+                    <td class="px-4 py-3">
+                        <form method="POST" action="{{ url_for('task_update', tid=t['id']) }}" class="inline">
+                            <select name="status" onchange="this.form.submit()" class="text-xs rounded border border-app px-2 py-1
+                                {% if t['status'] == '未开始' %}status-todo{% elif t['status'] == '进行中' %}status-doing{% else %}status-done{% endif %}">
+                                <option value="未开始" {{ 'selected' if t['status'] == '未开始' }}>未开始</option>
+                                <option value="进行中" {{ 'selected' if t['status'] == '进行中' }}>进行中</option>
+                                <option value="已完成" {{ 'selected' if t['status'] == '已完成' }}>已完成</option>
+                            </select>
+                        </form>
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <button onclick="editTask({{ t['id'] }}, '{{ t['name']|e }}', '{{ t['type'] }}', '{{ t['priority'] }}', '{{ t['deadline'] or '' }}', '{{ t['scheduled_date'] or '' }}', '{{ t['focus_category'] or 'Work' }}')" class="text-xs text-primary hover:underline mr-2">编辑</button>
+                        <form method="POST" action="{{ url_for('task_delete', tid=t['id']) }}" class="inline" onsubmit="return confirmDelete('确定删除此任务？')">
+                            <button type="submit" class="text-xs text-red-500 hover:underline">删除</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-center text-muted py-12">
+            {% if tab == 'today' %}今日暂无任务{% elif tab == 'upcoming' %}暂无即将到来的任务{% else %}暂无长期任务{% endif %}
+        </p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 新建任务模态框 -->
+<div id="modal-task" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">新建任务</h3>
+            <button onclick="closeModal('modal-task')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('task_add') }}" class="space-y-3">
+            <div>
+                <label class="form-label">任务名称</label>
+                <input type="text" name="name" required class="form-input" placeholder="输入任务名称">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">Focus</label>
+                    <select name="focus_category" class="form-input">
+                        <option value="Work">工作</option>
+                        <option value="Life">生活</option>
+                        <option value="Growth">成长</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">优先级</label>
+                    <select name="priority" class="form-input">
+                        <option value="高">高</option>
+                        <option value="中" selected>中</option>
+                        <option value="低">低</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">截止时间</label>
+                    <input type="date" name="deadline" class="form-input">
+                </div>
+                <div>
+                    <label class="form-label">安排日期</label>
+                    <input type="date" name="scheduled_date" class="form-input" value="{{ today }}">
+                </div>
+            </div>
+            <div>
+                <label class="form-label">类型</label>
+                <select name="type" class="form-input">
+                    <option>工作</option><option>生活</option><option>学习</option><option>其他</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary w-full">创建任务</button>
+        </form>
+    </div>
+</div>
+
+<!-- 编辑任务模态框 -->
+<div id="modal-edit-task" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">编辑任务</h3>
+            <button onclick="closeModal('modal-edit-task')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form id="form-edit-task" method="POST" action="" class="space-y-3">
+            <div>
+                <label class="form-label">任务名称</label>
+                <input type="text" name="name" id="edit-name" required class="form-input">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">Focus</label>
+                    <select name="focus_category" id="edit-focus" class="form-input">
+                        <option value="Work">工作</option>
+                        <option value="Life">生活</option>
+                        <option value="Growth">成长</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">优先级</label>
+                    <select name="priority" id="edit-priority" class="form-input">
+                        <option value="高">高</option>
+                        <option value="中">中</option>
+                        <option value="低">低</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">截止时间</label>
+                    <input type="date" name="deadline" id="edit-deadline" class="form-input">
+                </div>
+                <div>
+                    <label class="form-label">安排日期</label>
+                    <input type="date" name="scheduled_date" id="edit-scheduled" class="form-input">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary w-full">保存修改</button>
+        </form>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function editTask(id, name, type, priority, deadline, scheduled, focus) {
+    document.getElementById('form-edit-task').action = '/tasks/' + id + '/edit';
+    document.getElementById('edit-name').value = name;
+    document.getElementById('edit-focus').value = focus || 'Work';
+    document.getElementById('edit-priority').value = priority;
+    document.getElementById('edit-deadline').value = deadline;
+    document.getElementById('edit-scheduled').value = scheduled;
+    openModal('modal-edit-task');
+}
+</script>
+{% endblock %}
+{% endblock %}

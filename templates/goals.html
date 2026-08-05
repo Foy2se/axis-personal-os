@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+{% block title %}目标规划 - Personal OS{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <h1 class="text-2xl font-bold text-main">🎯 目标规划</h1>
+        <button onclick="openModal('modal-goal')" class="btn btn-primary">+ 新建目标</button>
+    </div>
+
+    <!-- 结构说明 -->
+    <div class="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
+        <div class="text-xs text-indigo-600 font-semibold mb-2">目标层级结构</div>
+        <div class="flex items-center gap-1 flex-wrap text-xs">
+            <span class="px-2 py-1 rounded bg-card text-sub border border-indigo-100">年度目标</span>
+            <span class="text-indigo-300">↓</span>
+            <span class="px-2 py-1 rounded bg-card text-sub border border-indigo-100">阶段目标</span>
+            <span class="text-indigo-300">↓</span>
+            <span class="px-2 py-1 rounded bg-card text-sub border border-indigo-100">月度计划</span>
+            <span class="text-indigo-300">↓</span>
+            <span class="px-2 py-1 rounded bg-card text-sub border border-indigo-100">具体行动</span>
+        </div>
+    </div>
+
+    <!-- 按层级展示 -->
+    {% for level in ['年度目标', '阶段目标', '月度计划', '行动'] %}
+    {% if level in goal_tree %}
+    <div class="bg-card rounded-xl border border-app p-5">
+        <h2 class="font-semibold text-main mb-3 flex items-center gap-2">
+            {% if level == '年度目标' %}🎯{% elif level == '阶段目标' %}📍{% elif level == '月度计划' %}📋{% else %}⚡{% endif %}
+            {{ level }}（{{ goal_tree[level]|length }}）
+        </h2>
+        <div class="space-y-2">
+            {% for g in goal_tree[level] %}
+            <div class="flex items-center gap-3 p-3 rounded-lg bg-hover hover:bg-hover">
+                <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                        <span class="font-medium text-main text-sm">{{ g['name'] }}</span>
+                        <span class="text-xs px-1.5 py-0.5 rounded
+                            {% if g['status'] == '进行中' %}bg-blue-100 text-blue-600
+                            {% elif g['status'] == '已完成' %}bg-green-100 text-green-600
+                            {% else %}bg-slate-100 text-sub{% endif %}">{{ g['status'] }}</span>
+                        {% if g['period'] %}
+                        <span class="text-xs text-muted">{{ g['period'] }}</span>
+                        {% endif %}
+                    </div>
+                    {% if g['description'] %}
+                    <p class="text-xs text-sub mt-1">{{ g['description'] }}</p>
+                    {% endif %}
+                    <!-- 进度条 -->
+                    <div class="mt-2 flex items-center gap-2">
+                        <div class="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-primary rounded-full transition-all" style="width: {{ g['progress'] }}%"></div>
+                        </div>
+                        <span class="text-xs text-sub w-10">{{ g['progress'] }}%</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick='editGoal({{ g['id']|tojson }}, {{ g['name']|tojson }}, {{ g['description']|tojson }}, {{ g['level']|tojson }}, {{ g['period']|tojson }}, {{ g['status']|tojson }}, {{ g['progress']|tojson }})' class="text-xs text-primary hover:underline">编辑</button>
+                    <form method="POST" action="{{ url_for('goal_delete', gid=g['id']) }}" class="inline" onsubmit="return confirmDelete('确定删除此目标？')">
+                        <button type="submit" class="text-xs text-red-500 hover:underline">删除</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    {% if not goal_tree %}
+    <div class="text-center text-muted py-12">暂无目标，从年度目标开始规划吧</div>
+    {% endif %}
+</div>
+
+<!-- 新建目标模态框 -->
+<div id="modal-goal" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">新建目标</h3>
+            <button onclick="closeModal('modal-goal')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('goal_add') }}" class="space-y-3">
+            <div>
+                <label class="form-label">目标名称</label>
+                <input type="text" name="name" required class="form-input" placeholder="目标名称">
+            </div>
+            <div>
+                <label class="form-label">目标描述</label>
+                <textarea name="description" rows="2" class="form-input" placeholder="详细描述..."></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">层级</label>
+                    <select name="level" class="form-input">
+                        <option>年度目标</option><option>阶段目标</option><option>月度计划</option><option>行动</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">周期</label>
+                    <input type="text" name="period" class="form-input" placeholder="如：2026-Q3">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">状态</label>
+                    <select name="status" class="form-input">
+                        <option>进行中</option><option>已完成</option><option>已放弃</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">进度 (%)</label>
+                    <input type="number" name="progress" min="0" max="100" value="0" class="form-input">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary w-full">创建目标</button>
+        </form>
+    </div>
+</div>
+
+<!-- 编辑目标模态框 -->
+<div id="modal-edit-goal" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">编辑目标</h3>
+            <button onclick="closeModal('modal-edit-goal')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form id="form-edit-goal" method="POST" action="" class="space-y-3">
+            <div>
+                <label class="form-label">目标名称</label>
+                <input type="text" name="name" id="eg-name" required class="form-input">
+            </div>
+            <div>
+                <label class="form-label">目标描述</label>
+                <textarea name="description" id="eg-desc" rows="2" class="form-input"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">层级</label>
+                    <select name="level" id="eg-level" class="form-input">
+                        <option>年度目标</option><option>阶段目标</option><option>月度计划</option><option>行动</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">周期</label>
+                    <input type="text" name="period" id="eg-period" class="form-input">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">状态</label>
+                    <select name="status" id="eg-status" class="form-input">
+                        <option>进行中</option><option>已完成</option><option>已放弃</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">进度 (%)</label>
+                    <input type="number" name="progress" id="eg-progress" min="0" max="100" class="form-input">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary w-full">保存修改</button>
+        </form>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function editGoal(id, name, desc, level, period, status, progress) {
+    document.getElementById('form-edit-goal').action = '/goals/' + id + '/update';
+    document.getElementById('eg-name').value = name || '';
+    document.getElementById('eg-desc').value = desc || '';
+    document.getElementById('eg-level').value = level || '年度目标';
+    document.getElementById('eg-period').value = period || '';
+    document.getElementById('eg-status').value = status || '进行中';
+    document.getElementById('eg-progress').value = progress || 0;
+    openModal('modal-edit-goal');
+}
+</script>
+{% endblock %}
+{% endblock %}

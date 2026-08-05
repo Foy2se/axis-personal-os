@@ -1,0 +1,253 @@
+{% extends 'base.html' %}
+{% block title %}今晚计划 - Personal OS{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+            <h1 class="text-2xl font-bold text-main">🌙 今晚计划</h1>
+            <p class="text-sm text-sub mt-1">{{ view_date }}{% if view_date == today %} · 今天{% endif %}</p>
+        </div>
+        <button onclick="openModal('modal-plan')" class="btn btn-primary">+ 添加计划</button>
+    </div>
+
+    <!-- 工作日志完成后的引导提示 -->
+    {% if from_context == 'worklog' %}
+    <div class="rounded-xl p-5 border" style="background: var(--primary-light); border-color: var(--primary);">
+        <div class="flex items-start gap-3">
+            <span class="text-2xl">✅</span>
+            <div class="flex-1">
+                <h3 class="font-semibold text-main">今日工作记录已完成</h3>
+                <p class="text-sm text-sub mt-1">是否规划今晚个人时间？用几分钟安排今晚要做的事，让晚间时间更有质量。</p>
+                <div class="flex items-center gap-2 mt-3">
+                    <button onclick="document.getElementById('quick-add-section').classList.toggle('hidden')" class="btn btn-primary text-sm">规划今晚</button>
+                    <a href="{{ url_for('evening_plan') }}" class="btn btn-secondary text-sm">稍后再说</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快速添加区（引导后展开） -->
+    <div id="quick-add-section" class="bg-card rounded-xl border border-app p-5 card hidden">
+        <h3 class="font-semibold text-main mb-3">⚡ 快速规划今晚（每行一个）</h3>
+        <form method="POST" action="{{ url_for('evening_plan_quick') }}" class="space-y-3">
+            <input type="hidden" name="plan_date" value="{{ today }}">
+            <div class="space-y-2">
+                <input type="text" name="names" class="form-input" placeholder="如：阅读《思考快与慢》30分钟" autofocus>
+                <input type="text" name="names" class="form-input" placeholder="如：整理本周灵感笔记">
+                <input type="text" name="names" class="form-input" placeholder="如：和家人视频通话">
+            </div>
+            <p class="text-xs text-muted">💡 每行一个计划，默认分类为"兴趣娱乐"，保存后可逐个调整分类和时间</p>
+            <button type="submit" class="btn btn-primary">添加到今晚计划</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- 昨天未完成项提醒 -->
+    {% if yesterday_pending %}
+    <div class="rounded-xl p-4 border" style="background: var(--tag-orange-bg); border-color: var(--tag-orange-text);">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="font-semibold" style="color: var(--tag-orange-text);">⏰ {{ yesterday_date }} 有 {{ yesterday_pending|length }} 项未完成</span>
+        </div>
+        <div class="space-y-1">
+            {% for p in yesterday_pending %}
+            <div class="flex items-center gap-2 p-2 rounded-lg bg-card">
+                <span class="text-sm flex-1 text-main">{{ p['name'] }}</span>
+                <span class="text-xs text-muted">{{ p['category'] }}</span>
+                <form method="POST" action="{{ url_for('evening_plan_defer', pid=p['id']) }}" class="inline">
+                    <button type="submit" class="btn btn-primary text-xs" onclick="return confirm('延后到今天（{{ today }}）？')">→ 延后到今天</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 今晚计划列表 -->
+    <div class="bg-card rounded-xl border border-app p-5">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-main">
+                📋 今晚计划
+                {% if pending > 0 %}
+                <span class="text-xs px-2 py-0.5 rounded ml-1" style="background:var(--tag-orange-bg);color:var(--tag-orange-text);">{{ pending }} 待执行</span>
+                {% endif %}
+            </h2>
+            <!-- 日期切换 -->
+            <input type="date" value="{{ view_date }}" onchange="window.location.href='{{ url_for('evening_plan') }}?date=' + this.value" class="form-input text-xs" style="width:auto;">
+        </div>
+
+        {% if plans %}
+        <div class="space-y-2">
+            {% for p in plans %}
+            <div class="flex items-start gap-3 p-3 rounded-lg border border-app
+                {% if p['status'] == '已完成' %}opacity-60{% elif p['status'] == '已放弃' %}opacity-40{% elif p['status'] == '已延后' %}opacity-50{% else %}bg-hover{% endif %}">
+                <!-- 状态/操作区 -->
+                <div class="flex flex-col items-center gap-1 pt-1">
+                    {% if p['status'] == '待执行' %}
+                    <form method="POST" action="{{ url_for('evening_plan_complete', pid=p['id']) }}" class="inline">
+                        <button type="submit" class="w-6 h-6 rounded-full border-2 hover:scale-110 transition" style="border-color:var(--text-muted);" title="标记完成"></button>
+                    </form>
+                    {% elif p['status'] == '已完成' %}
+                    <span class="text-green-500 text-lg">✓</span>
+                    {% elif p['status'] == '已延后' %}
+                    <span class="text-blue-400 text-lg">→</span>
+                    {% else %}
+                    <span class="text-muted text-lg">✕</span>
+                    {% endif %}
+                </div>
+
+                <!-- 内容区 -->
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-sm font-medium {% if p['status'] != '待执行' %}line-through text-muted{% else %}text-main{% endif %}">{{ p['name'] }}</span>
+                        <span class="text-xs px-1.5 py-0.5 rounded
+                            {% if p['category'] == '工作延续' %}priority-high
+                            {% elif p['category'] == '学习成长' %}status-todo
+                            {% elif p['category'] == '生活事项' %}priority-low
+                            {% else %}status-done{% endif %}">{{ p['category'] }}</span>
+                        <span class="text-xs px-1.5 py-0.5 rounded
+                            {% if p['priority'] == '高' %}priority-high{% elif p['priority'] == '中' %}priority-mid{% else %}priority-low{% endif %}">{{ p['priority'] }}</span>
+                        {% if p['estimated_time'] %}
+                        <span class="text-xs text-muted">⏰ {{ p['estimated_time'] }}</span>
+                        {% endif %}
+                        {% if p['status'] == '已延后' and p['deferred_to'] %}
+                        <span class="text-xs text-blue-400">→ {{ p['deferred_to'] }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 操作按钮 -->
+                {% if p['status'] == '待执行' %}
+                <div class="flex items-center gap-1 flex-shrink-0">
+                    <button onclick="deferPlan({{ p['id'] }}, '{{ p['name']|e }}')" class="text-xs text-blue-400 hover:underline px-1">延后</button>
+                    <button onclick="reschedulePlan({{ p['id'] }}, '{{ p['name']|e }}')" class="text-xs text-primary hover:underline px-1">重排</button>
+                    <form method="POST" action="{{ url_for('evening_plan_abandon', pid=p['id']) }}" class="inline" onsubmit="return confirm('确定放弃「{{ p['name'] }}」？')">
+                        <button type="submit" class="text-xs text-muted hover:text-red-400 px-1">放弃</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('evening_plan_delete', pid=p['id']) }}" class="inline" onsubmit="return confirmDelete('确定删除？')">
+                        <button type="submit" class="text-xs text-red-500 hover:underline px-1">删除</button>
+                    </form>
+                </div>
+                {% else %}
+                <form method="POST" action="{{ url_for('evening_plan_delete', pid=p['id']) }}" class="inline" onsubmit="return confirmDelete('确定删除？')">
+                    <button type="submit" class="text-xs text-red-500 hover:underline">删除</button>
+                </form>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <p class="text-muted text-sm">今晚还没有计划</p>
+            <button onclick="openModal('modal-plan')" class="btn btn-primary mt-3 text-sm">添加第一个计划</button>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 睡前提醒说明 -->
+    <div class="bg-card rounded-xl border border-app p-4">
+        <div class="flex items-center gap-2 text-sm text-sub">
+            <span>😴</span>
+            <span>睡前打开此页面，系统会引导你确认今晚计划的完成情况。未完成项可延后到明天、重新安排或放弃。</span>
+        </div>
+    </div>
+</div>
+
+<!-- 添加计划模态框 -->
+<div id="modal-plan" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg text-main">添加今晚计划</h3>
+            <button onclick="closeModal('modal-plan')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('evening_plan_add') }}" class="space-y-3">
+            <div>
+                <label class="form-label">任务名称</label>
+                <input type="text" name="name" required class="form-input" placeholder="今晚想做什么？">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">分类</label>
+                    <select name="category" class="form-input">
+                        <option value="工作延续">工作延续</option>
+                        <option value="学习成长">学习成长</option>
+                        <option value="生活事项">生活事项</option>
+                        <option value="兴趣娱乐" selected>兴趣娱乐</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">优先级</label>
+                    <select name="priority" class="form-input">
+                        <option value="高">高</option>
+                        <option value="中" selected>中</option>
+                        <option value="低">低</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">预计完成时间</label>
+                    <input type="time" name="estimated_time" class="form-input">
+                </div>
+                <div>
+                    <label class="form-label">日期</label>
+                    <input type="date" name="plan_date" class="form-input" value="{{ view_date }}">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary w-full">添加计划</button>
+        </form>
+    </div>
+</div>
+
+<!-- 延后确认模态框 -->
+<div id="modal-defer" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width:420px;">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg text-main">延后到明天</h3>
+            <button onclick="closeModal('modal-defer')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <p class="text-sm text-sub mb-4">「<span id="defer-name" class="font-medium text-main"></span>」将延后到明天，并自动生成明天的待办候选。</p>
+        <form id="form-defer" method="POST" action="" class="flex gap-2">
+            <button type="submit" class="btn btn-primary flex-1">确认延后</button>
+            <button type="button" onclick="closeModal('modal-defer')" class="btn btn-secondary">取消</button>
+        </form>
+    </div>
+</div>
+
+<!-- 重新安排模态框 -->
+<div id="modal-reschedule" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width:420px;">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg text-main">重新安排</h3>
+            <button onclick="closeModal('modal-reschedule')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <p class="text-sm text-sub mb-4">「<span id="reschedule-name" class="font-medium text-main"></span>」安排到哪天？</p>
+        <form id="form-reschedule" method="POST" action="" class="space-y-3">
+            <div>
+                <label class="form-label">选择日期</label>
+                <input type="date" name="new_date" id="reschedule-date" required class="form-input" value="{{ today }}">
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="btn btn-primary flex-1">确认安排</button>
+                <button type="button" onclick="closeModal('modal-reschedule')" class="btn btn-secondary">取消</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function deferPlan(id, name) {
+    document.getElementById('defer-name').textContent = name;
+    document.getElementById('form-defer').action = '/evening-plan/' + id + '/defer';
+    openModal('modal-defer');
+}
+
+function reschedulePlan(id, name) {
+    document.getElementById('reschedule-name').textContent = name;
+    document.getElementById('form-reschedule').action = '/evening-plan/' + id + '/reschedule';
+    openModal('modal-reschedule');
+}
+</script>
+{% endblock %}
+{% endblock %}

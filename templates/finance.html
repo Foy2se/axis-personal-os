@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+{% block title %}财务管理 - Personal OS{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <h1 class="text-2xl font-bold text-main">💰 财务管理</h1>
+        <input type="month" onchange="window.location.href='{{ url_for('finance') }}?ym=' + this.value" value="{{ year_month }}" class="form-input">
+    </div>
+
+    <div class="bg-amber-50 rounded-xl p-4 border border-amber-100 text-xs text-amber-700">
+        💡 低成本了解资金流向，不做传统详细记账。只记录重要消费和月度概览。
+    </div>
+
+    <!-- 月度资金概览 -->
+    <div class="bg-card rounded-xl border border-app p-5">
+        <h2 class="font-semibold text-main mb-3">📊 {{ year_month }} 资金概览</h2>
+        <form method="POST" action="{{ url_for('finance_monthly_save') }}" class="space-y-3">
+            <input type="hidden" name="year_month" value="{{ year_month }}">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                    <label class="form-label">收入</label>
+                    <input type="number" step="0.01" name="income" class="form-input" value="{{ monthly['income'] if monthly else 0 }}">
+                </div>
+                <div>
+                    <label class="form-label">固定支出</label>
+                    <input type="number" step="0.01" name="fixed_expense" class="form-input" value="{{ monthly['fixed_expense'] if monthly else 0 }}">
+                </div>
+                <div>
+                    <label class="form-label">自由支配金额</label>
+                    <input type="number" step="0.01" name="free_amount" class="form-input" value="{{ monthly['free_amount'] if monthly else 0 }}">
+                </div>
+            </div>
+            <div>
+                <label class="form-label">月度总结</label>
+                <textarea name="summary" rows="2" class="form-input" placeholder="本月资金流向总结...">{{ monthly['summary'] if monthly else '' }}</textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">保存</button>
+        </form>
+    </div>
+
+    <!-- 大额消费记录 -->
+    <div class="bg-card rounded-xl border border-app p-5">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold text-main">💳 大额消费记录</h2>
+            <button onclick="openModal('modal-expense')" class="btn btn-primary text-sm">+ 添加</button>
+        </div>
+        {% if expenses %}
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-hover">
+                    <tr>
+                        <th class="text-left px-3 py-2 text-xs font-semibold text-sub">商品</th>
+                        <th class="text-left px-3 py-2 text-xs font-semibold text-sub">金额</th>
+                        <th class="text-left px-3 py-2 text-xs font-semibold text-sub hidden sm:table-cell">分类</th>
+                        <th class="text-left px-3 py-2 text-xs font-semibold text-sub hidden sm:table-cell">日期</th>
+                        <th class="text-left px-3 py-2 text-xs font-semibold text-sub">满意度</th>
+                        <th class="text-right px-3 py-2 text-xs font-semibold text-sub">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in expenses %}
+                    <tr class="border-b border-app hover:bg-hover">
+                        <td class="px-3 py-2 text-sm">{{ e['item_name'] }}</td>
+                        <td class="px-3 py-2 text-sm font-medium text-red-500">¥{{ e['amount'] }}</td>
+                        <td class="px-3 py-2 text-xs hidden sm:table-cell">{{ e['category'] }}</td>
+                        <td class="px-3 py-2 text-xs hidden sm:table-cell">{{ e['expense_date'] or '-' }}</td>
+                        <td class="px-3 py-2 text-xs">{{ get_stars(e['satisfaction']) }}</td>
+                        <td class="px-3 py-2 text-right">
+                            <form method="POST" action="{{ url_for('finance_expense_delete', eid=e['id']) }}" class="inline" onsubmit="return confirmDelete('确定删除？')">
+                                <button type="submit" class="text-xs text-red-500 hover:underline">删除</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-center text-muted py-4">暂无大额消费记录</p>
+        {% endif %}
+    </div>
+
+    <!-- 消费决策库 -->
+    <div class="bg-card rounded-xl border border-app p-5">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold text-main">🤔 消费决策库</h2>
+            <button onclick="openModal('modal-decision')" class="btn btn-primary text-sm">+ 添加</button>
+        </div>
+        {% if decisions %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {% for d in decisions %}
+            <div class="p-3 rounded-lg bg-hover">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-medium text-sm">{{ d['item_name'] }}</span>
+                    <form method="POST" action="{{ url_for('finance_decision_delete', did=d['id']) }}" class="inline" onsubmit="return confirmDelete('确定删除？')">
+                        <button type="submit" class="text-xs text-red-500 hover:underline">删除</button>
+                    </form>
+                </div>
+                <div class="text-xs text-sub space-y-1">
+                    {% if d['budget'] %}<div>预算: ¥{{ d['budget'] }}</div>{% endif %}
+                    {% if d['reason'] %}<div>原因: {{ d['reason'] }}</div>{% endif %}
+                    {% if d['decision'] %}<div>决定: {{ d['decision'] }}</div>{% endif %}
+                    {% if d['satisfaction'] %}<div>满意度: {{ get_stars(d['satisfaction']) }}</div>{% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-center text-muted py-4">暂无消费决策记录</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 大额消费模态框 -->
+<div id="modal-expense" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">添加大额消费</h3>
+            <button onclick="closeModal('modal-expense')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('finance_expense_add') }}" class="space-y-3">
+            <div>
+                <label class="form-label">商品名称</label>
+                <input type="text" name="item_name" required class="form-input">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">金额</label>
+                    <input type="number" step="0.01" name="amount" required class="form-input">
+                </div>
+                <div>
+                    <label class="form-label">分类</label>
+                    <select name="category" class="form-input">
+                        <option>工作</option><option>学习</option><option>生活</option><option>娱乐</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">购买日期</label>
+                    <input type="date" name="expense_date" class="form-input" value="{{ today }}">
+                </div>
+                <div>
+                    <label class="form-label">满意度(1-5)</label>
+                    <input type="number" name="satisfaction" min="1" max="5" class="form-input">
+                </div>
+            </div>
+            <div>
+                <label class="form-label">购买原因</label>
+                <textarea name="reason" rows="2" class="form-input"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary w-full">添加</button>
+        </form>
+    </div>
+</div>
+
+<!-- 消费决策模态框 -->
+<div id="modal-decision" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">添加消费决策</h3>
+            <button onclick="closeModal('modal-decision')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('finance_decision_add') }}" class="space-y-3">
+            <div>
+                <label class="form-label">商品名称</label>
+                <input type="text" name="item_name" required class="form-input">
+            </div>
+            <div>
+                <label class="form-label">购买原因</label>
+                <textarea name="reason" rows="2" class="form-input"></textarea>
+            </div>
+            <div>
+                <label class="form-label">预算</label>
+                <input type="number" step="0.01" name="budget" class="form-input">
+            </div>
+            <div>
+                <label class="form-label">研究记录</label>
+                <textarea name="research" rows="2" class="form-input" placeholder="对比、评测等..."></textarea>
+            </div>
+            <div>
+                <label class="form-label">最终决定</label>
+                <input type="text" name="decision" class="form-input" placeholder="如：买/不买/再等等">
+            </div>
+            <button type="submit" class="btn btn-primary w-full">添加</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

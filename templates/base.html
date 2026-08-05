@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN" {% if request.args.get('pwa') == '1' %}data-pwa{% endif %}>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{% block title %}AXIS{% endblock %}</title>
+
+    <!-- PWA / iOS Meta -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="AXIS">
+    <meta name="theme-color" content="#6366f1" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+    <link rel="manifest" href="{{ request.url_root.rstrip('/') }}{{ url_for('manifest') }}">
+    <link rel="apple-touch-icon" sizes="120x120" href="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='icons/axis-touch-120.png') }}">
+    <link rel="apple-touch-icon" sizes="167x167" href="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='icons/axis-touch-167.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='icons/axis-touch-180.png') }}">
+    <link rel="apple-touch-icon-precomposed" sizes="180x180" href="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='icons/axis-touch-180.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='icons/favicon.png') }}">
+    <link rel="shortcut icon" href="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='icons/favicon.ico') }}">
+
+    <!-- 防闪烁：在渲染前应用主题 + PWA 模式检测 -->
+    <script>
+        (function() {
+            const theme = localStorage.getItem('theme') || 'auto';
+            const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const isDark = theme === 'dark' || (theme === 'auto' && sysDark);
+            if (isDark) document.documentElement.setAttribute('data-theme', 'dark');
+
+            // PWA 模式检测：URL 参数或 sessionStorage
+            var urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('pwa') === '1') {
+                sessionStorage.setItem('axis_pwa', '1');
+            }
+            if (sessionStorage.getItem('axis_pwa') === '1' || window.self !== window.top) {
+                document.documentElement.setAttribute('data-pwa', '');
+            }
+        })();
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
+</head>
+<body class="bg-app text-main" style="height: 100vh; min-height: 100vh; background: var(--bg);">
+<div class="flex" style="height: 100vh; min-height: 100vh;">
+    <!-- 侧边栏 -->
+    <aside class="bg-sidebar text-sidebar flex-shrink-0 fixed lg:static top-0 bottom-0 left-0 z-50 transform -translate-x-full lg:translate-x-0 transition-transform flex flex-col" id="sidebar" style="width: 13.5rem; height: 100vh; min-height: 100vh; background: var(--sidebar-bg);">
+        <!-- Logo 区域 -->
+        <div class="sidebar-header px-4 py-3.5 border-b flex items-center gap-2.5 flex-shrink-0" style="border-color: var(--sidebar-hover);">
+            <img src="{{ url_for('static', filename='icons/axis-logo.jpg') }}" alt="AXIS" class="w-9 h-9 rounded-xl shadow-sm">
+            <div>
+                <h1 class="text-lg axis-logo-text text-white leading-tight">AXIS</h1>
+                <p class="sidebar-logo-sub mt-0">Personal OS 3.0</p>
+            </div>
+        </div>
+
+        <!-- 主题切换器 -->
+        <div class="px-3 py-2 flex-shrink-0">
+            <div class="theme-toggle theme-toggle-compact w-full justify-center">
+                <button class="theme-btn flex-1 text-center" data-theme-val="light" onclick="setTheme('light')">🌞</button>
+                <button class="theme-btn flex-1 text-center" data-theme-val="auto" onclick="setTheme('auto')">🖥️</button>
+                <button class="theme-btn flex-1 text-center" data-theme-val="dark" onclick="setTheme('dark')">🌙</button>
+            </div>
+        </div>
+
+        <!-- 菜单区域 -->
+        <nav class="flex-1 px-2.5 pt-1 pb-4 overflow-y-auto overscroll-contain" style="-webkit-overflow-scrolling: touch;">
+            <!-- Core -->
+            <div class="sidebar-section">
+                <a href="{{ url_for('dashboard') }}" class="sidebar-nav-item block rounded-lg text-sm transition {{ 'bg-primary text-white' if active_page == 'dashboard' else 'text-sidebar hover:bg-sidebar' }}" style="--tw-bg-opacity:1;">
+                    ◉ Core
+                </a>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Plan</div>
+                <a href="{{ url_for('calendar_view') }}" class="sidebar-nav-item block rounded-lg text-sm transition {{ 'bg-primary text-white' if active_page == 'calendar' else 'text-sidebar hover:bg-sidebar' }}">📅 Calendar</a>
+                <a href="{{ url_for('tasks') }}" class="sidebar-nav-item block rounded-lg text-sm transition {{ 'bg-primary text-white' if active_page == 'tasks' else 'text-sidebar hover:bg-sidebar' }}">✅ Tasks</a>
+                <a href="{{ url_for('goals') }}" class="sidebar-nav-item block rounded-lg text-sm transition {{ 'bg-primary text-white' if active_page == 'goals' else 'text-sidebar hover:bg-sidebar' }}">🎯 Goals</a>
+                <a href="{{ url_for('life_cycle') }}" class="sidebar-nav-item block rounded-lg text-sm transition {{ 'bg-primary text-white' if active_page == 'life_cycle' else 'text-sidebar hover:bg-sidebar' }}">🔄 Recurring</a>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Log</div>
+                <a href="{{ url_for('work_logs') }}" class="sidebar-nav-item block rounded-lg text-sm transition {{ 'bg-primary text-white' if active_page == 'work_logs' else 'text-sidebar hover:bg-sidebar' }}">📝 Work Record</a>
+                <a href="{{ url_for('projects') }}" class="sidebar-nav-item block rounded-lg text-sm transition {{ 'bg-primary text-white' if active_page == 'projects' else 'text-sidebar hover:bg-sidebar' }}">📁 Project Archive</a>
+                <a href="{{ url_for('inbox') }}" class="sidebar-nav-item block rounded-lg text-sm transition {{ 'bg-primary text-white' if active_page == 'inbox' else 'text-sidebar hover:bg-sidebar' }}">💡 Idea Inbox</a>
+                <a href="{{ url_for('notes') }}" class="sidebar-nav-item block rounded-lg text-sm transition {{ 'bg-primary text-white' if active_page == 'notes' else 'text-sidebar hover:bg-sidebar' }}">📖 Daily Log</a>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Life</div>
+                <a href="{{ url_for('health') }}" class="sidebar-nav-item block rounded-lg text-sm transition {{ 'bg-primary text-white' if active_page == 'health' else 'text-sidebar hover:bg-sidebar' }}">❤️ Health</a>
+                <a href="{{ url_for('finance') }}" class="sidebar-nav-item block rounded-lg text-sm transition {{ 'bg-primary text-white' if active_page == 'finance' else 'text-sidebar hover:bg-sidebar' }}">💰 Finance</a>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Me</div>
+                <a href="{{ url_for('evening_plan') }}" class="sidebar-nav-item block rounded-lg text-sm transition {{ 'bg-primary text-white' if active_page == 'evening_plan' else 'text-sidebar hover:bg-sidebar' }}">🌙 Tonight</a>
+                <a href="{{ url_for('automation') }}" class="sidebar-nav-item block rounded-lg text-sm transition {{ 'bg-primary text-white' if active_page == 'automation' else 'text-sidebar hover:bg-sidebar' }}">⏰ Automation</a>
+                <a href="{{ url_for('settings') }}" class="sidebar-nav-item block rounded-lg text-sm transition {{ 'bg-primary text-white' if active_page == 'settings' else 'text-sidebar hover:bg-sidebar' }}">⚙️ Settings</a>
+            </div>
+
+            <!-- 底部留白：确保最后一项可轻松触达 -->
+            <div class="nav-spacer"></div>
+        </nav>
+
+        <!-- 用户信息 + 登出 -->
+        {% if current_user %}
+        <div class="flex-shrink-0 px-3 py-2 border-t" style="border-color: var(--sidebar-hover); background: var(--sidebar-bg);">
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 min-w-0">
+                    <div class="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0" style="background: var(--primary); color: white;">
+                        {{ current_user['name'][0] if current_user['name'] else current_user['email'][0]|upper }}
+                    </div>
+                    <div class="min-w-0">
+                        <div class="text-xs font-medium text-sidebar truncate">{{ current_user['name'] or current_user['email'] }}</div>
+                        <div class="text-[10px] text-sidebar-muted truncate">{{ current_user['email'] }}</div>
+                    </div>
+                </div>
+                <a href="{{ url_for('logout') }}" class="text-sidebar-muted hover:text-red-400 text-sm flex-shrink-0" title="退出登录">⏻</a>
+            </div>
+        </div>
+        {% endif %}
+    </aside>
+
+    <!-- 遮罩层 -->
+    <div class="fixed top-0 left-0 right-0 bottom-0 z-40 lg:hidden hidden" id="sidebar-overlay" onclick="toggleSidebar()" style="background: var(--overlay); height: 100vh; min-height: 100vh;"></div>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 lg:ml-0 overflow-x-hidden" style="min-height: 100vh; background: var(--bg);">
+        <!-- 移动端顶栏：精致毛玻璃风格 -->
+        <div class="mobile-topbar lg:hidden sticky top-0 z-30" style="background: var(--bg); border-bottom: 1px solid var(--border-light); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);">
+            <div class="px-4 h-12 flex items-center justify-between">
+                <button onclick="toggleSidebar()" class="text-sub w-10 h-10 flex items-center justify-center rounded-full hover:bg-hover transition" aria-label="打开菜单">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                </button>
+                <span class="axis-navbar-title text-main">AXIS</span>
+                <button onclick="toggleThemeQuick()" class="text-sub w-10 h-10 flex items-center justify-center rounded-full hover:bg-hover transition" id="mobile-theme-btn" aria-label="切换主题">🖥️</button>
+            </div>
+        </div>
+
+        <div class="p-3 lg:p-6 max-w-7xl mx-auto" style="min-height: 100vh; padding-bottom: calc(96px + env(safe-area-inset-bottom));">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+</div>
+
+<!-- 移动端底部导航栏 -->
+<nav class="lg:hidden fixed z-30 flex items-center justify-around" id="bottom-nav">
+    <a href="{{ url_for('dashboard') }}" class="bottom-nav-item {{ 'active' if active_page == 'dashboard' else '' }}">
+        <span class="bottom-nav-icon">◉</span>
+        <span class="bottom-nav-label">Core</span>
+    </a>
+    <a href="{{ url_for('tasks') }}" class="bottom-nav-item {{ 'active' if active_page in ('tasks', 'calendar', 'goals', 'life_cycle') else '' }}">
+        <span class="bottom-nav-icon">✅</span>
+        <span class="bottom-nav-label">Plan</span>
+    </a>
+    <a href="{{ url_for('work_logs') }}" class="bottom-nav-item {{ 'active' if active_page in ('work_logs', 'projects', 'inbox', 'notes') else '' }}">
+        <span class="bottom-nav-icon">📝</span>
+        <span class="bottom-nav-label">Log</span>
+    </a>
+    <a href="{{ url_for('health') }}" class="bottom-nav-item {{ 'active' if active_page in ('health', 'finance') else '' }}">
+        <span class="bottom-nav-icon">❤️</span>
+        <span class="bottom-nav-label">Life</span>
+    </a>
+    <a href="{{ url_for('settings') }}" class="bottom-nav-item {{ 'active' if active_page in ('settings', 'evening_plan', 'automation') else '' }}">
+        <span class="bottom-nav-icon">⚙️</span>
+        <span class="bottom-nav-label">Me</span>
+    </a>
+</nav>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

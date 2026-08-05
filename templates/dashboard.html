@@ -1,0 +1,314 @@
+{% extends 'base.html' %}
+{% block title %}AXIS Core{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <!-- Header -->
+    <div class="flex items-end justify-between flex-wrap gap-3">
+        <div class="min-w-0 flex-1">
+            <div class="text-xs text-sub tracking-widest uppercase mb-1">{{ greeting_en }}</div>
+            <h1 class="text-2xl sm:text-3xl font-light text-main tracking-wide">{{ greeting }}</h1>
+            <p class="text-sm text-sub mt-1">{{ now.strftime('%Y年%m月%d日') }} {{ now.strftime('%A') }}</p>
+        </div>
+        <div class="text-right flex-shrink-0">
+            <div class="text-xl sm:text-2xl font-mono text-main">{{ now.strftime('%H:%M') }}</div>
+            <div class="text-[10px] text-muted axis-logo-text tracking-widest">AXIS Personal OS</div>
+        </div>
+    </div>
+
+    <!-- Daily Loop 状态条 -->
+    {% if current_loop_phase != 'none' %}
+    <div class="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 rounded-2xl p-3 sm:p-4 border border-app">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style="background: var(--primary-light); color: var(--primary-text);">
+                    {% if current_loop_phase == 'morning' %}🌅{% elif current_loop_phase == 'evening' %}🌆{% else %}🌙{% endif %}
+                </div>
+                <div>
+                    <div class="font-medium text-main">
+                        {% if current_loop_phase == 'morning' %}Morning Start{% elif current_loop_phase == 'evening' %}Evening Review{% else %}Before Sleep{% endif %}
+                    </div>
+                    <div class="text-xs text-sub">
+                        {% if current_loop_phase == 'morning' %}查看天气与今日重点，开始新的一天{% elif current_loop_phase == 'evening' %}记录工作，规划今晚{% else %}回顾今日，记录精力与心情{% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                {% if current_loop_phase == 'morning' %}
+                <a href="#today-focus" class="btn btn-primary btn-sm">查看重点</a>
+                {% elif current_loop_phase == 'evening' %}
+                <a href="{{ url_for('work_logs') }}" class="btn btn-primary btn-sm">记录工作</a>
+                {% else %}
+                <a href="{{ url_for('health') }}" class="btn btn-primary btn-sm">睡前记录</a>
+                {% endif %}
+                <form method="POST" action="{{ url_for('daily_loop_complete') }}" class="inline">
+                    <input type="hidden" name="phase" value="{{ current_loop_phase }}">
+                    <button type="submit" class="btn btn-secondary btn-sm">完成</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 第一行：Personal Status + Weather -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <!-- Personal Status -->
+        <div class="bg-card rounded-2xl p-5 card border border-app lg:col-span-1">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="font-semibold text-main">Personal Status</h2>
+                <a href="{{ url_for('health') }}" class="text-xs text-primary">记录 →</a>
+            </div>
+            {% if today_health %}
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-sub">睡眠</span>
+                    <span class="text-sm text-yellow-500">{{ get_stars(today_health['sleep_score']) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-sub">精力</span>
+                    <span class="text-sm text-green-500">{{ get_stars(today_health['energy_score']) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-sub">状态</span>
+                    <span class="text-sm text-indigo-500">{{ get_stars(today_health['status_score']) }}</span>
+                </div>
+                {% if today_health['mood_score'] %}
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-sub">心情</span>
+                    <span class="text-sm text-pink-500">{{ get_stars(today_health['mood_score']) }}</span>
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="text-center py-6">
+                <div class="text-3xl mb-2">😶</div>
+                <p class="text-sm text-muted">今日状态尚未记录</p>
+                <a href="{{ url_for('health') }}" class="text-xs text-primary mt-2 inline-block">去记录</a>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Weather -->
+        <div class="bg-card rounded-2xl p-5 card border border-app lg:col-span-2">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="font-semibold text-main">Weather</h2>
+                <span class="text-xs text-muted">{{ weather.city_name }} · {{ weather.updated_at }}</span>
+            </div>
+            <div class="flex items-center gap-4 sm:gap-6">
+                <div class="text-center flex-shrink-0">
+                    <div class="text-4xl sm:text-5xl mb-1">{{ weather.icon }}</div>
+                    <div class="text-sm text-sub">{{ weather.condition }}</div>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-3xl sm:text-4xl font-light text-main">{{ weather.temperature }}{{ weather.unit }}</div>
+                    {% if weather.today_max is not none %}
+                    <div class="text-sm text-sub mt-1">
+                        今日 {{ weather.today_min }}° ~ {{ weather.today_max }}°
+                        {% if weather.tomorrow_max is not none %}
+                        · 明日 {{ weather.tomorrow_min }}° ~ {{ weather.tomorrow_max }}°
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if weather.humidity %}
+                    <div class="text-xs text-muted mt-1">湿度 {{ weather.humidity }}%</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Today Focus -->
+    <div id="today-focus" class="bg-card rounded-2xl p-5 card border border-app">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-main">Today Focus</h2>
+            <a href="{{ url_for('tasks') }}" class="text-xs text-primary">管理 Tasks →</a>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {% for fc, label, color in [('Work', '工作', 'indigo'), ('Life', '生活', 'green'), ('Growth', '成长', 'purple')] %}
+            <div class="rounded-xl p-4 border border-app" style="background: var(--bg);">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="w-2 h-2 rounded-full bg-{{ color }}-500"></span>
+                    <span class="text-sm font-medium text-main">{{ label }}</span>
+                </div>
+                {% if today_focus[fc] %}
+                <ul class="space-y-2">
+                    {% for t in today_focus[fc] %}
+                    <li class="flex items-center gap-2 text-sm">
+                        <form method="POST" action="{{ url_for('task_update', tid=t['id']) }}" class="inline">
+                            <input type="checkbox" onchange="this.form.submit()" name="status" value="已完成" class="rounded">
+                        </form>
+                        <span class="flex-1 {{ 'line-through text-muted' if t['status'] == '已完成' else '' }}">{{ t['name'] }}</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded
+                            {% if t['priority'] == '高' %}priority-high{% elif t['priority'] == '中' %}priority-mid{% else %}priority-low{% endif %}">{{ t['priority'] }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-xs text-muted py-2">暂无 {{ label }} 重点</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="bg-card rounded-2xl p-5 card border border-app">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-main">Timeline</h2>
+            <a href="{{ url_for('calendar_view') }}" class="text-xs text-primary">Calendar →</a>
+        </div>
+        {% if today_events or today_tasks_for_timeline or due_cycles or today_evening_plans %}
+        <div class="space-y-3">
+            {% for ev in today_events %}
+            <div class="flex items-start gap-3 p-3 rounded-xl bg-hover">
+                <span class="text-xs font-mono text-sub w-14 pt-0.5">{{ ev['event_time'] or '全天' }}</span>
+                <div class="flex-1">
+                    <div class="text-sm">{{ ev['title'] }}</div>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-600">{{ ev['type'] }}</span>
+                </div>
+            </div>
+            {% endfor %}
+            {% for t in today_tasks_for_timeline %}
+            <div class="flex items-start gap-3 p-3 rounded-xl bg-hover">
+                <span class="text-xs font-mono text-sub w-14 pt-0.5">待办</span>
+                <div class="flex-1">
+                    <div class="text-sm">{{ t['name'] }}</div>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded
+                        {% if t['priority'] == '高' %}priority-high{% elif t['priority'] == '中' %}priority-mid{% else %}priority-low{% endif %}">{{ t['priority'] }}</span>
+                </div>
+            </div>
+            {% endfor %}
+            {% for p in today_evening_plans %}
+            <div class="flex items-start gap-3 p-3 rounded-xl bg-purple-50/50 border border-purple-100">
+                <span class="text-xs font-mono text-purple-500 w-14 pt-0.5">{{ p['estimated_time'] or '今晚' }}</span>
+                <div class="flex-1">
+                    <div class="text-sm">{{ p['name'] }}</div>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-600">{{ p['category'] }}</span>
+                </div>
+            </div>
+            {% endfor %}
+            {% for c in due_cycles %}
+            <div class="flex items-start gap-3 p-3 rounded-xl bg-red-50/50 border border-red-100">
+                <span class="text-xs font-mono text-red-500 w-14 pt-0.5">到期</span>
+                <div class="flex-1">
+                    <div class="text-sm">{{ c['name'] }}</div>
+                    <span class="text-[10px] text-red-500">{{ c['next_date'] }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-muted py-4 text-center">今日时间线为空，<a href="{{ url_for('calendar_view') }}" class="text-primary">添加安排 →</a></p>
+        {% endif %}
+    </div>
+
+    <!-- AXIS Insight -->
+    <div class="bg-card rounded-2xl p-5 card border border-app">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-main"><span class="axis-logo-text">AXIS</span> Insight</h2>
+            <span class="text-xs text-muted">AI 主动分析</span>
+        </div>
+        {% if ai_insights %}
+        <div class="space-y-3">
+            {% for ins in ai_insights %}
+            <div class="flex items-start gap-3 p-3 rounded-xl bg-hover border-l-4
+                {% if ins['priority'] == '高' %}border-red-400{% elif ins['priority'] == '中' %}border-yellow-400{% else %}border-blue-400{% endif %}">
+                <div class="flex-1">
+                    <div class="text-sm font-medium text-main">{{ ins['title'] }}</div>
+                    <div class="text-xs text-sub mt-1">{{ ins['content'] }}</div>
+                </div>
+                <form method="POST" action="{{ url_for('insight_dismiss', iid=ins['id']) }}" class="flex-shrink-0">
+                    <button type="submit" class="text-muted hover:text-sub text-xs">✕</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-muted py-4 text-center">当前没有需要关注的洞察 ✨</p>
+        {% endif %}
+    </div>
+
+    <!-- Quick Action -->
+    <div class="bg-card rounded-2xl p-5 card border border-app">
+        <h2 class="font-semibold text-main mb-4">Quick Action</h2>
+        <div class="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3">
+            <button onclick="openModal('modal-task')" class="quick-btn flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl bg-indigo-50 text-indigo-600">
+                <span class="text-xl sm:text-2xl">＋</span>
+                <span class="text-xs font-medium">任务</span>
+            </button>
+            <button onclick="openModal('modal-inbox')" class="quick-btn flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl bg-yellow-50 text-yellow-600">
+                <span class="text-xl sm:text-2xl">💡</span>
+                <span class="text-xs font-medium">想法</span>
+            </button>
+            <a href="{{ url_for('work_logs') }}" class="quick-btn flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl bg-green-50 text-green-600">
+                <span class="text-xl sm:text-2xl">📝</span>
+                <span class="text-xs font-medium">记录</span>
+            </a>
+            <a href="{{ url_for('health') }}" class="quick-btn flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl bg-red-50 text-red-600">
+                <span class="text-xl sm:text-2xl">❤️</span>
+                <span class="text-xs font-medium">状态</span>
+            </a>
+            <a href="{{ url_for('settings') }}" class="quick-btn flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl bg-slate-50 text-slate-600 col-span-3 sm:col-span-1">
+                <span class="text-xl sm:text-2xl">⚙️</span>
+                <span class="text-xs font-medium">设置</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- 快速添加任务模态框 -->
+<div id="modal-task" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">新建任务</h3>
+            <button onclick="closeModal('modal-task')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('task_quick_add') }}" class="space-y-3">
+            <div>
+                <label class="form-label">任务名称</label>
+                <input type="text" name="name" required class="form-input" placeholder="输入任务名称">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">聚焦方向</label>
+                    <select name="focus_category" class="form-input">
+                        <option value="Work">工作</option>
+                        <option value="Life">生活</option>
+                        <option value="Growth">成长</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">优先级</label>
+                    <select name="priority" class="form-input">
+                        <option value="高">高</option>
+                        <option value="中" selected>中</option>
+                        <option value="低">低</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary w-full">创建任务</button>
+        </form>
+    </div>
+</div>
+
+<!-- 快速记录灵感模态框 -->
+<div id="modal-inbox" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">快速记录想法</h3>
+            <button onclick="closeModal('modal-inbox')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('inbox_quick_add') }}" class="space-y-3">
+            <div>
+                <label class="form-label">标题（可选）</label>
+                <input type="text" name="title" class="form-input" placeholder="不填将自动截取">
+            </div>
+            <div>
+                <label class="form-label">内容</label>
+                <textarea name="content" rows="4" required class="form-input" placeholder="记录你的想法..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary w-full">保存想法</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

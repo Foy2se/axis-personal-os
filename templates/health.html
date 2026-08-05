@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% block title %}健康管理 - Personal OS{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <h1 class="text-2xl font-bold text-main">❤️ 健康状态记录</h1>
+    </div>
+
+    <div class="bg-red-50 rounded-xl p-4 border border-red-100 text-xs text-red-700">
+        ❤️ 目标：观察长期趋势，不做复杂健康管理。每天3个评分 + 可选备注即可。
+    </div>
+
+    <!-- 今日记录 -->
+    <div class="bg-card rounded-xl border border-app p-5">
+        <h2 class="font-semibold text-main mb-4">⚡ 快速记录今日状态</h2>
+        <form method="POST" action="{{ url_for('health_save') }}" class="space-y-4">
+            <input type="hidden" name="record_date" value="{{ today }}">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="text-center">
+                    <label class="form-label mb-2">睡眠评分</label>
+                    <div class="star-rating" id="sleep-stars" data-star-rating data-input-id="sleep-input">
+                        <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
+                    </div>
+                    <input type="hidden" name="sleep_score" id="sleep-input" value="{{ today_record['sleep_score'] if today_record else 0 }}">
+                </div>
+                <div class="text-center">
+                    <label class="form-label mb-2">精力评分</label>
+                    <div class="star-rating" id="energy-stars" data-star-rating data-input-id="energy-input">
+                        <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
+                    </div>
+                    <input type="hidden" name="energy_score" id="energy-input" value="{{ today_record['energy_score'] if today_record else 0 }}">
+                </div>
+                <div class="text-center">
+                    <label class="form-label mb-2">状态评分</label>
+                    <div class="star-rating" id="status-stars" data-star-rating data-input-id="status-input">
+                        <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
+                    </div>
+                    <input type="hidden" name="status_score" id="status-input" value="{{ today_record['status_score'] if today_record else 0 }}">
+                </div>
+            </div>
+            <div>
+                <label class="form-label">备注（可选）</label>
+                <input type="text" name="note" class="form-input" placeholder="如：昨晚熬夜、运动后精力好..." value="{{ today_record['note'] if today_record else '' }}">
+            </div>
+            <button type="submit" class="btn btn-primary">保存</button>
+        </form>
+    </div>
+
+    <!-- 趋势图 -->
+    <div class="bg-card rounded-xl border border-app p-5">
+        <h2 class="font-semibold text-main mb-3">📈 近30天趋势</h2>
+        {% if records %}
+        <canvas id="health-chart" height="100"></canvas>
+        {% else %}
+        <p class="text-center text-muted py-8">暂无数据，开始记录后此处将显示趋势图</p>
+        {% endif %}
+    </div>
+
+    <!-- 历史记录 -->
+    <div class="bg-card rounded-xl border border-app p-5">
+        <h2 class="font-semibold text-main mb-3">历史记录</h2>
+        {% if records %}
+        <div class="space-y-2 max-h-96 overflow-y-auto">
+            {% for r in records %}
+            <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-hover text-sm">
+                <span class="text-sub text-xs w-24">{{ r['record_date'] }}</span>
+                <span class="text-xs w-20">睡 {{ get_stars(r['sleep_score']) }}</span>
+                <span class="text-xs w-20">力 {{ get_stars(r['energy_score']) }}</span>
+                <span class="text-xs w-20">态 {{ get_stars(r['status_score']) }}</span>
+                <span class="text-xs text-muted flex-1 truncate">{{ r['note'] or '' }}</span>
+                <form method="POST" action="{{ url_for('health_delete', hid=r['id']) }}" class="inline" onsubmit="return confirmDelete('确定删除？')">
+                    <button type="submit" class="text-xs text-red-500 hover:underline">删除</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-center text-muted py-4">暂无记录</p>
+        {% endif %}
+    </div>
+</div>
+
+{% block scripts %}
+{% if records %}
+<script>
+const ctx = document.getElementById('health-chart').getContext('2d');
+const dates = [{% for r in records|reverse %}'{{ r['record_date'] }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+const sleep = [{% for r in records|reverse %}{{ r['sleep_score'] or 0 }}{% if not loop.last %}, {% endif %}{% endfor %}];
+const energy = [{% for r in records|reverse %}{{ r['energy_score'] or 0 }}{% if not loop.last %}, {% endif %}{% endfor %}];
+const status = [{% for r in records|reverse %}{{ r['status_score'] or 0 }}{% if not loop.last %}, {% endif %}{% endfor %}];
+
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: dates,
+        datasets: [
+            { label: '睡眠', data: sleep, borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.1)', tension: 0.3 },
+            { label: '精力', data: energy, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', tension: 0.3 },
+            { label: '状态', data: status, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', tension: 0.3 }
+        ]
+    },
+    options: {
+        responsive: true,
+        scales: { y: { min: 0, max: 5, ticks: { stepSize: 1 } } },
+        plugins: { legend: { position: 'top' } }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}
+{% endblock %}

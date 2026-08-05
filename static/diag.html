@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AXIS 诊断</title>
+<style>
+body{font-family:monospace;padding:20px;background:#1a1a2e;color:#0f0;font-size:13px}
+h2{color:#6366f1}
+.ok{color:#0f0}.fail{color:#f00}.info{color:#aaa}
+button{padding:10px 20px;font-size:14px;margin:5px;border:none;border-radius:8px;cursor:pointer}
+.go{background:#6366f1;color:#fff}
+</style></head><body>
+<h2>AXIS 连接诊断</h2>
+<div id="log">正在检测...</div>
+<div style="margin-top:20px">
+<button class="go" onclick="location.href='/?x-cs-sandbox-id=330accb0a92b4106ab541a3fd6d3f6e3&x-cs-sandbox-port=5000&pwa=1'">直接进入 AXIS</button>
+</div>
+<script>
+var log=document.getElementById('log');
+function add(msg,cls){var d=document.createElement('div');d.className=cls||'';d.textContent=msg;log.appendChild(d)}
+
+// 1. 检测 SW
+if('serviceWorker' in navigator){
+    navigator.serviceWorker.getRegistrations().then(function(regs){
+        if(regs.length===0){
+            add('✅ 无 Service Worker 注册','ok');
+        }else{
+            add('⚠️ 发现 '+regs.length+' 个 SW，正在注销...','fail');
+            regs.forEach(function(r){r.unregister()});
+            add('已注销，请刷新页面','info');
+        }
+    });
+}else{
+    add('ℹ️ 浏览器不支持 SW','info');
+}
+
+// 2. ping 测试
+fetch('/ping?x-cs-sandbox-id=330accb0a92b4106ab541a3fd6d3f6e3&x-cs-sandbox-port=5000&t='+Date.now(),{cache:'no-cache'})
+.then(function(r){return r.text()})
+.then(function(t){add('✅ Ping 成功: '+t,'ok')})
+.catch(function(e){add('❌ Ping 失败: '+e,'fail')});
+
+// 3. 首页测试
+fetch('/?x-cs-sandbox-id=330accb0a92b4106ab541a3fd6d3f6e3&x-cs-sandbox-port=5000&pwa=1&t='+Date.now(),{cache:'no-cache'})
+.then(function(r){
+    add('✅ 首页响应: '+r.status+' '+r.headers.get('content-type'),'ok');
+})
+.catch(function(e){add('❌ 首页失败: '+e,'fail')});
+
+// 4. 在线状态
+add(navigator.onLine?'✅ 网络在线':'❌ 离线',navigator.onLine?'ok':'fail');
+</script>
+</body></html>

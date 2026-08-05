@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% block title %}学习计划 - Personal OS{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <h1 class="text-2xl font-bold text-main">🎓 学习计划</h1>
+        <button onclick="openModal('modal-learning')" class="btn btn-primary">+ 添加学习计划</button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {% for l in items %}
+        <div class="bg-card rounded-xl border border-app p-4 card">
+            <div class="flex items-start justify-between mb-2">
+                <h3 class="font-semibold text-main">{{ l['content'] }}</h3>
+                <div class="flex items-center gap-2">
+                    <button onclick='editLearning({{ l['id']|tojson }}, {{ l['content']|tojson }}, {{ l['goal']|tojson }}, {{ l['period']|tojson }}, {{ l['progress']|tojson }}, {{ l['result']|tojson }})' class="text-xs text-primary hover:underline">编辑</button>
+                    <form method="POST" action="{{ url_for('learning_delete', lid=l['id']) }}" class="inline" onsubmit="return confirmDelete('确定删除？')">
+                        <button type="submit" class="text-xs text-red-500 hover:underline">删除</button>
+                    </form>
+                </div>
+            </div>
+            {% if l['goal'] %}<p class="text-xs text-sub mb-2">目标: {{ l['goal'] }}</p>{% endif %}
+            {% if l['period'] %}<p class="text-xs text-sub mb-2">周期: {{ l['period'] }}</p>{% endif %}
+            <div class="mt-2 flex items-center gap-2">
+                <div class="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                    <div class="h-full bg-primary rounded-full" style="width: {{ l['progress'] }}%"></div>
+                </div>
+                <span class="text-xs text-sub w-10">{{ l['progress'] }}%</span>
+            </div>
+            {% if l['result'] %}<p class="text-xs text-sub mt-2">{{ l['result'] }}</p>{% endif %}
+        </div>
+        {% else %}
+        <div class="col-span-2 text-center text-muted py-12">暂无学习计划</div>
+        {% endfor %}
+    </div>
+</div>
+
+<div id="modal-learning" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">添加学习计划</h3>
+            <button onclick="closeModal('modal-learning')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('learning_add') }}" class="space-y-3">
+            <div>
+                <label class="form-label">学习内容</label>
+                <input type="text" name="content" required class="form-input">
+            </div>
+            <div>
+                <label class="form-label">学习目标</label>
+                <textarea name="goal" rows="2" class="form-input"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">周期</label>
+                    <input type="text" name="period" class="form-input" placeholder="如：3个月">
+                </div>
+                <div>
+                    <label class="form-label">进度 (%)</label>
+                    <input type="number" name="progress" min="0" max="100" value="0" class="form-input">
+                </div>
+            </div>
+            <div>
+                <label class="form-label">成果记录</label>
+                <textarea name="result" rows="2" class="form-input"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary w-full">添加</button>
+        </form>
+    </div>
+</div>
+
+<div id="modal-edit-learning" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">编辑学习计划</h3>
+            <button onclick="closeModal('modal-edit-learning')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form id="form-edit-learning" method="POST" action="" class="space-y-3">
+            <div>
+                <label class="form-label">学习内容</label>
+                <input type="text" name="content" id="el-content" required class="form-input">
+            </div>
+            <div>
+                <label class="form-label">学习目标</label>
+                <textarea name="goal" id="el-goal" rows="2" class="form-input"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">周期</label>
+                    <input type="text" name="period" id="el-period" class="form-input">
+                </div>
+                <div>
+                    <label class="form-label">进度 (%)</label>
+                    <input type="number" name="progress" id="el-progress" min="0" max="100" class="form-input">
+                </div>
+            </div>
+            <div>
+                <label class="form-label">成果记录</label>
+                <textarea name="result" id="el-result" rows="2" class="form-input"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary w-full">保存修改</button>
+        </form>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function editLearning(id, content, goal, period, progress, result) {
+    document.getElementById('form-edit-learning').action = '/learning/' + id + '/update';
+    document.getElementById('el-content').value = content || '';
+    document.getElementById('el-goal').value = goal || '';
+    document.getElementById('el-period').value = period || '';
+    document.getElementById('el-progress').value = progress || 0;
+    document.getElementById('el-result').value = result || '';
+    openModal('modal-edit-learning');
+}
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,268 @@
+{% extends 'base.html' %}
+{% block title %}Settings - AXIS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <h1 class="text-2xl font-bold text-main">⚙️ Settings</h1>
+
+    {% if request.args.get('msg') %}
+    {% set msg_parts = request.args.get('msg').split('|') %}
+    <div class="rounded-xl p-4 border text-sm" style="{% if msg_parts[0] == 'success' %}background:var(--tag-green-bg);color:var(--tag-green-text);border-color:var(--tag-green-text){% elif msg_parts[0] == 'info' %}background:var(--tag-blue-bg);color:var(--tag-blue-text);border-color:var(--tag-blue-text){% else %}background:var(--tag-red-bg);color:var(--tag-red-text);border-color:var(--tag-red-text){% endif %}">
+        {{ msg_parts[1] if msg_parts|length > 1 else msg_parts[0] }}
+    </div>
+    {% endif %}
+
+    <!-- AXIS 核心设置 -->
+    <div class="bg-card rounded-xl border border-app p-5 card">
+        <h2 class="font-semibold text-main mb-4">◉ <span class="axis-logo-text">AXIS</span> 核心设置</h2>
+        <form method="POST" action="{{ url_for('settings_save') }}" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="form-label">城市（英文，用于天气查询）</label>
+                    <input type="text" name="city" class="form-input" value="{{ user_settings.city or 'Beijing' }}" placeholder="如 Beijing, Shanghai">
+                </div>
+                <div>
+                    <label class="form-label">城市名称（中文显示）</label>
+                    <input type="text" name="city_name" class="form-input" value="{{ user_settings.city_name or '北京' }}" placeholder="如 北京">
+                </div>
+            </div>
+            <div>
+                <label class="form-label">当前阶段目标</label>
+                <input type="text" name="current_stage_goal" class="form-input" value="{{ user_settings.current_stage_goal or '' }}" placeholder="如：完成产品3.0上线">
+            </div>
+            <div>
+                <label class="form-label">长期方向</label>
+                <textarea name="life_direction" rows="2" class="form-input" placeholder="你的长期方向和优先级，AXIS AI 会据此辅助决策">{{ user_settings.life_direction or '' }}</textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="form-label">工作开始时间</label>
+                    <input type="time" name="work_hours_start" class="form-input" value="{{ user_settings.work_hours_start or '09:00' }}">
+                </div>
+                <div>
+                    <label class="form-label">工作结束时间</label>
+                    <input type="time" name="work_hours_end" class="form-input" value="{{ user_settings.work_hours_end or '18:00' }}">
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <input type="checkbox" name="daily_loop_enabled" id="daily_loop_enabled" {{ 'checked' if user_settings.daily_loop_enabled }} class="rounded">
+                <label for="daily_loop_enabled" class="text-sm text-sub">启用 Daily Loop（晨间启动 / 晚间回顾 / 睡前检查）</label>
+            </div>
+            <button type="submit" class="btn btn-primary">保存设置</button>
+        </form>
+    </div>
+
+    <!-- 账号信息 -->
+    <div class="bg-card rounded-xl border border-app p-5 card">
+        <h2 class="font-semibold text-main mb-4">👤 账号</h2>
+        <div class="grid grid-cols-2 gap-4 text-sm mb-4">
+            <div>
+                <div class="text-xs text-muted">邮箱</div>
+                <div class="text-main font-medium">{{ current_user['email'] }}</div>
+            </div>
+            <div>
+                <div class="text-xs text-muted">姓名</div>
+                <div class="text-main font-medium">{{ current_user['name'] or '未设置' }}</div>
+            </div>
+        </div>
+        <details class="text-sm">
+            <summary class="cursor-pointer text-primary hover:underline">修改密码</summary>
+            <form method="POST" action="{{ url_for('change_password') }}" class="mt-3 space-y-3 max-w-sm">
+                <div>
+                    <label class="form-label">原密码</label>
+                    <input type="password" name="old_password" required class="form-input">
+                </div>
+                <div>
+                    <label class="form-label">新密码（至少6位）</label>
+                    <input type="password" name="new_password" required class="form-input" minlength="6">
+                </div>
+                <button type="submit" class="btn btn-primary text-sm">修改密码</button>
+            </form>
+        </details>
+        <div class="mt-3 text-xs text-muted">
+            💡 登录后所有数据自动在 iPhone / iPad / Mac 间同步。换设备登录同一账号即可恢复全部数据。
+        </div>
+    </div>
+
+    <!-- 主题设置 -->
+    <div class="bg-card rounded-xl border border-app p-5 card">
+        <h2 class="font-semibold text-main mb-4">🎨 主题</h2>
+        <div class="theme-toggle" style="display:inline-flex;">
+            <button class="theme-btn" data-theme-val="light" onclick="setTheme('light')">🌞 亮色</button>
+            <button class="theme-btn" data-theme-val="auto" onclick="setTheme('auto')">🖥️ 跟随系统</button>
+            <button class="theme-btn" data-theme-val="dark" onclick="setTheme('dark')">🌙 暗色</button>
+        </div>
+        <div class="mt-3 text-xs text-muted">
+            当前：<span id="current-theme-display">--</span> · 实际：<span id="effective-theme-display">--</span>
+        </div>
+    </div>
+
+    <!-- 数据导出 -->
+    <div class="bg-card rounded-xl border border-app p-5 card">
+        <h2 class="font-semibold text-main mb-4">📥 Data Center · 数据导出</h2>
+
+        <div class="mb-4 p-3 rounded-lg bg-hover">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-medium text-sub">数据总览</span>
+                <span class="text-lg font-bold text-primary">{{ total_records }} 条</span>
+            </div>
+            <div class="grid grid-cols-4 sm:grid-cols-5 gap-1 text-xs">
+                {% for table, count in stats.items() %}
+                <div class="text-center p-1.5 rounded bg-card border border-app">
+                    <span class="font-bold text-main">{{ count }}</span>
+                    <span class="text-muted block truncate">{{ table }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- 三种格式导出 -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <a href="{{ url_for('export_data') }}" class="block p-4 rounded-lg bg-hover hover:border-primary border border-app transition">
+                <div class="text-sm font-medium text-main mb-1">JSON 完整备份</div>
+                <div class="text-xs text-muted">包含全部数据，用于系统迁移和恢复</div>
+                <div class="mt-2 text-xs text-primary">→ 下载 .json</div>
+            </a>
+            <a href="{{ url_for('export_csv') }}" class="block p-4 rounded-lg bg-hover hover:border-primary border border-app transition">
+                <div class="text-sm font-medium text-main mb-1">CSV 数据分析</div>
+                <div class="text-xs text-muted">每张表一个CSV，可在 Excel/Numbers 打开</div>
+                <div class="mt-2 text-xs text-primary">→ 下载 .zip</div>
+            </a>
+            <a href="{{ url_for('export_markdown') }}" class="block p-4 rounded-lg bg-hover hover:border-primary border border-app transition">
+                <div class="text-sm font-medium text-main mb-1">Markdown 知识迁移</div>
+                <div class="text-xs text-muted">笔记/日志/灵感导出为.md，可导入 Notion/Obsidian</div>
+                <div class="mt-2 text-xs text-primary">→ 下载 .zip</div>
+            </a>
+        </div>
+    </div>
+
+    <!-- 数据导入 -->
+    <div class="bg-card rounded-xl border border-app p-5 card">
+        <h2 class="font-semibold text-main mb-4">📤 数据恢复</h2>
+        <form method="POST" action="{{ url_for('import_data') }}" enctype="multipart/form-data" class="space-y-3" onsubmit="return confirmImport(this)">
+            <div>
+                <label class="form-label">选择 JSON 备份文件</label>
+                <input type="file" name="backup_file" accept=".json" required class="form-input" style="padding: 0.5rem;">
+            </div>
+            <div>
+                <label class="form-label">导入模式</label>
+                <select name="mode" class="form-input">
+                    <option value="replace">替换模式（清空现有数据后导入）</option>
+                    <option value="merge">追加模式（保留现有数据，追加导入）</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-danger text-sm">导入数据</button>
+        </form>
+    </div>
+
+    <!-- 自动备份 -->
+    <div class="bg-card rounded-xl border border-app p-5 card">
+        <h2 class="font-semibold text-main mb-4">🗄️ 自动备份</h2>
+        <div class="space-y-3">
+            <div class="flex items-center justify-between p-3 rounded-lg bg-hover">
+                <div>
+                    <div class="text-sm font-medium text-main">每日自动备份</div>
+                    <div class="text-xs text-muted">每天首次打开时自动备份，保留最近30天</div>
+                </div>
+                <form method="POST" action="{{ url_for('backup_trigger') }}">
+                    <button type="submit" class="btn btn-secondary text-sm">立即备份</button>
+                </form>
+            </div>
+
+            <!-- 备份历史 -->
+            {% if backups %}
+            <div>
+                <div class="text-xs font-medium text-sub mb-2">备份历史（最近{{ backups|length }}次）</div>
+                <div class="space-y-1 max-h-48 overflow-y-auto">
+                    {% for b in backups %}
+                    <div class="flex items-center justify-between p-2 rounded-lg bg-hover text-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="px-1.5 py-0.5 rounded {% if b['backup_type'] == 'auto' %}status-todo{% else %}status-done{% endif %}">
+                                {{ '自动' if b['backup_type'] == 'auto' else '手动' }}
+                            </span>
+                            <span class="text-sub">{{ b['created_at'][:16] }}</span>
+                            <span class="text-muted">{{ (b['file_size'] / 1024)|round(1) }}KB</span>
+                        </div>
+                        <a href="{{ url_for('backup_download', bid=b['id']) }}" class="text-primary hover:underline">下载</a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <p class="text-xs text-muted text-center py-2">暂无备份记录，点击"立即备份"创建第一个</p>
+            {% endif %}
+
+            <div class="text-xs text-muted p-3 rounded-lg" style="background:var(--tag-indigo-bg);">
+                🔒 预留云备份接口：未来可接入 iCloud / AWS S3 / 阿里云 OSS，实现异地容灾备份。即使服务器迁移，数据也不会丢失。
+            </div>
+        </div>
+    </div>
+
+    <!-- 多设备使用 -->
+    <div class="bg-card rounded-xl border border-app p-5 card">
+        <h2 class="font-semibold text-main mb-4">📱 Device Sync · 多设备使用</h2>
+        <div class="space-y-3 text-sm text-sub">
+            <div class="p-3 rounded-lg bg-hover">
+                <div class="font-medium text-main mb-1">iPhone / iPad</div>
+                <ol class="text-xs space-y-1 text-muted ml-4 list-decimal">
+                    <li>Safari 打开应用地址</li>
+                    <li>登录账号</li>
+                    <li>分享 → 添加到主屏幕</li>
+                    <li>从主屏幕打开，全屏 App 体验</li>
+                </ol>
+            </div>
+            <div class="p-3 rounded-lg bg-hover">
+                <div class="font-medium text-main mb-1">iMac</div>
+                <ol class="text-xs space-y-1 text-muted ml-4 list-decimal">
+                    <li>Safari 打开并登录</li>
+                    <li>拖地址到 Dock 栏快速访问</li>
+                </ol>
+            </div>
+            <div class="p-3 rounded-lg bg-hover">
+                <div class="font-medium text-main mb-1">数据同步</div>
+                <p class="text-xs text-muted">部署到云服务器后，所有设备登录同一账号，数据实时同步。无需额外操作。</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 关于 -->
+    <div class="bg-card rounded-xl border border-app p-5 card">
+        <h2 class="font-semibold text-main mb-3">ℹ️ 关于</h2>
+        <div class="text-sm text-sub space-y-1">
+            <div class="flex items-center gap-2 mb-2">
+                <img src="{{ url_for('static', filename='icons/axis-logo.jpg') }}" alt="AXIS" class="w-8 h-8 rounded-lg">
+                <div>
+                    <div class="font-medium text-main axis-logo-text">AXIS Personal OS 3.0</div>
+                    <div class="text-xs text-muted">Organize. Reflect. Evolve.</div>
+                </div>
+            </div>
+            <p class="text-xs text-muted">五大模块 · Daily Loop · AI Insight · 天气模块 · 多设备同步 · PWA</p>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function confirmImport(form) {
+    const mode = form.querySelector('[name="mode"]').value;
+    if (mode === 'replace') {
+        return confirm('⚠️ 替换模式将清空现有数据并从备份恢复！\n\n确定继续吗？');
+    }
+    return confirm('追加模式将在现有数据基础上导入，可能有重复。\n\n确定继续吗？');
+}
+
+function updateThemeDisplay() {
+    const theme = localStorage.getItem('theme') || 'auto';
+    const labels = { light: '亮色', dark: '暗色', auto: '跟随系统' };
+    document.getElementById('current-theme-display').textContent = labels[theme] || '跟随系统';
+    const effective = getEffectiveTheme();
+    document.getElementById('effective-theme-display').textContent = effective === 'dark' ? '暗色 🌙' : '亮色 🌞';
+}
+
+document.addEventListener('DOMContentLoaded', updateThemeDisplay);
+document.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.addEventListener('click', () => setTimeout(updateThemeDisplay, 100));
+});
+</script>
+{% endblock %}
+{% endblock %}

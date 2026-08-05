@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  axis:
+    build: .
+    container_name: axis-os
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/data
+    environment:
+      - DB_PATH=/data/personal_os.db
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - HOST=0.0.0.0
+      - PORT=5000

@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% block title %}知识资产 - Personal OS{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <h1 class="text-2xl font-bold text-main">🗄️ ���识资产</h1>
+    </div>
+
+    <!-- Tab 切换 -->
+    <div class="flex bg-card rounded-lg border border-app overflow-hidden">
+        <a href="{{ url_for('archive', tab='cases') }}" class="px-4 py-2 text-sm {{ 'bg-primary text-white' if tab == 'cases' else 'text-sub hover:bg-hover' }}">案例库</a>
+        <a href="{{ url_for('archive', tab='methods') }}" class="px-4 py-2 text-sm {{ 'bg-primary text-white' if tab == 'methods' else 'text-sub hover:bg-hover' }}">方法论库</a>
+        <a href="{{ url_for('archive', tab='views') }}" class="px-4 py-2 text-sm {{ 'bg-primary text-white' if tab == 'views' else 'text-sub hover:bg-hover' }}">个人观点库</a>
+    </div>
+
+    <!-- 案例库 -->
+    {% if tab == 'cases' %}
+    <div class="bg-card rounded-xl border border-app p-5">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold text-main">案例库</h2>
+            <button onclick="openModal('modal-case')" class="btn btn-primary text-sm">+ 添加案例</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {% for c in cases %}
+            <div class="p-3 rounded-lg bg-hover">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-medium text-sm">{{ c['name'] }}</span>
+                    <form method="POST" action="{{ url_for('archive_case_delete', cid=c['id']) }}" class="inline" onsubmit="return confirmDelete('确定删除？')">
+                        <button type="submit" class="text-xs text-red-500 hover:underline">删除</button>
+                    </form>
+                </div>
+                <div class="text-xs text-sub space-y-1">
+                    {% if c['industry'] %}<span class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-600 mr-1">{{ c['industry'] }}</span>{% endif %}
+                    {% if c['type'] %}<span class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-600 mr-1">{{ c['type'] }}</span>{% endif %}
+                    {% if c['tags'] %}{% for tag in c['tags'].split(',') %}<span class="px-1.5 py-0.5 rounded bg-slate-200 text-sub">{{ tag.strip() }}</span>{% endfor %}{% endif %}
+                    {% if c['analysis'] %}<p class="mt-1">{{ c['analysis'] }}</p>{% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div class="col-span-2 text-center text-muted py-8">暂无案例</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 方法论库 -->
+    {% if tab == 'methods' %}
+    <div class="bg-card rounded-xl border border-app p-5">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold text-main">方法论库</h2>
+            <button onclick="openModal('modal-method')" class="btn btn-primary text-sm">+ 添加方法论</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {% for m in methods %}
+            <div class="p-3 rounded-lg bg-hover">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-medium text-sm">{{ m['title'] }}</span>
+                    <form method="POST" action="{{ url_for('archive_method_delete', mid=m['id']) }}" class="inline" onsubmit="return confirmDelete('确定删除？')">
+                        <button type="submit" class="text-xs text-red-500 hover:underline">删除</button>
+                    </form>
+                </div>
+                {% if m['tags'] %}<div class="mb-1">{% for tag in m['tags'].split(',') %}<span class="text-xs px-1.5 py-0.5 rounded bg-slate-200 text-sub mr-1">{{ tag.strip() }}</span>{% endfor %}</div>{% endif %}
+                {% if m['content'] %}<p class="text-xs text-sub whitespace-pre-wrap">{{ m['content'] }}</p>{% endif %}
+            </div>
+            {% else %}
+            <div class="col-span-2 text-center text-muted py-8">暂无方法论</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 个人观点库 -->
+    {% if tab == 'views' %}
+    <div class="bg-card rounded-xl border border-app p-5">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold text-main">个人观点库</h2>
+            <button onclick="openModal('modal-view')" class="btn btn-primary text-sm">+ 添加观点</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {% for v in views %}
+            <div class="p-3 rounded-lg bg-hover">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-medium text-sm">{{ v['title'] }}</span>
+                    <form method="POST" action="{{ url_for('archive_viewpoint_delete', vid=v['id']) }}" class="inline" onsubmit="return confirmDelete('确定删除？')">
+                        <button type="submit" class="text-xs text-red-500 hover:underline">删除</button>
+                    </form>
+                </div>
+                {% if v['tags'] %}<div class="mb-1">{% for tag in v['tags'].split(',') %}<span class="text-xs px-1.5 py-0.5 rounded bg-slate-200 text-sub mr-1">{{ tag.strip() }}</span>{% endfor %}</div>{% endif %}
+                {% if v['content'] %}<p class="text-xs text-sub whitespace-pre-wrap">{{ v['content'] }}</p>{% endif %}
+            </div>
+            {% else %}
+            <div class="col-span-2 text-center text-muted py-8">暂无观点</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- 案例模态框 -->
+<div id="modal-case" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">添加案例</h3>
+            <button onclick="closeModal('modal-case')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('archive_case_add') }}" class="space-y-3">
+            <div><label class="form-label">案例名称</label><input type="text" name="name" required class="form-input"></div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="form-label">行业</label><input type="text" name="industry" class="form-input"></div>
+                <div><label class="form-label">类型</label><input type="text" name="type" class="form-input" placeholder="如：营销、产品"></div>
+            </div>
+            <div><label class="form-label">标签（逗号分隔）</label><input type="text" name="tags" class="form-input"></div>
+            <div><label class="form-label">个人分析</label><textarea name="analysis" rows="4" class="form-input"></textarea></div>
+            <button type="submit" class="btn btn-primary w-full">添加</button>
+        </form>
+    </div>
+</div>
+
+<!-- 方法论模态框 -->
+<div id="modal-method" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width: 640px;">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">添加方法论</h3>
+            <button onclick="closeModal('modal-method')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('archive_method_add') }}" class="space-y-3">
+            <div><label class="form-label">标题</label><input type="text" name="title" required class="form-input"></div>
+            <div><label class="form-label">内容</label><textarea name="content" rows="6" class="form-input"></textarea></div>
+            <div><label class="form-label">标签</label><input type="text" name="tags" class="form-input"></div>
+            <button type="submit" class="btn btn-primary w-full">添加</button>
+        </form>
+    </div>
+</div>
+
+<!-- 观点模态框 -->
+<div id="modal-view" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width: 640px;">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">添加观点</h3>
+            <button onclick="closeModal('modal-view')" class="text-muted hover:text-sub">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('archive_viewpoint_add') }}" class="space-y-3">
+            <div><label class="form-label">标题</label><input type="text" name="title" required class="form-input"></div>
+            <div><label class="form-label">内容</label><textarea name="content" rows="6" class="form-input"></textarea></div>
+            <div><label class="form-label">标签</label><input type="text" name="tags" class="form-input"></div>
+            <button type="submit" class="btn btn-primary w-full">添加</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

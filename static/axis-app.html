@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>AXIS</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="AXIS">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/axis-touch-180.png?v=2">
+    <link rel="apple-touch-icon" sizes="167x167" href="/static/icons/axis-touch-167.png?v=2">
+    <link rel="apple-touch-icon" sizes="120x120" href="/static/icons/axis-touch-120.png?v=2">
+    <link rel="apple-touch-icon-precomposed" href="/static/icons/axis-touch-180.png?v=2">
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=2">
+    <link rel="icon" type="image/png" sizes="512x512" href="/static/icons/icon-512.png?v=2">
+    <link rel="icon" type="image/png" href="/static/icons/favicon.png?v=2">
+    <link rel="manifest" href="/static/manifest.json?v=2">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%; height: 100vh; min-height: 100vh;
+            background: #ffffff; overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        @media (prefers-color-scheme: dark) { html, body { background: #0f172a; } }
+        #app {
+            position: fixed; inset: 0; width: 100%; height: 100vh;
+            min-height: 100vh; border: none; display: block;
+        }
+        .splash {
+            position: fixed; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            background: radial-gradient(ellipse at 50% 40%, #1e293b 0%, #0f172a 60%);
+            z-index: 9999; transition: opacity 0.6s, visibility 0.6s;
+        }
+        .splash.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+        .splash-logo {
+            width: 90px; height: 90px; border-radius: 22px; object-fit: cover;
+            box-shadow: 0 16px 48px rgba(99,102,241,0.3), 0 0 0 1px rgba(255,255,255,0.08);
+            margin-bottom: 1.4rem;
+        }
+        .splash-title {
+            font-size: 1rem; letter-spacing: 0.28em; color: rgba(255,255,255,0.92);
+            text-transform: uppercase; font-weight: 500;
+        }
+        .splash-subtitle {
+            font-size: 0.6rem; letter-spacing: 0.2em; color: rgba(255,255,255,0.4);
+            text-transform: uppercase; margin-top: 0.4rem; font-weight: 300;
+        }
+        .splash-progress {
+            width: 100px; height: 2px; background: rgba(255,255,255,0.1);
+            border-radius: 2px; margin-top: 1.6rem; overflow: hidden;
+        }
+        .splash-progress-bar {
+            width: 0%; height: 100%;
+            background: linear-gradient(90deg, #6366f1, #a855f7);
+            border-radius: 2px; transition: width 0.3s ease;
+        }
+        .splash-status {
+            font-size: 0.62rem; color: rgba(255,255,255,0.3);
+            margin-top: 0.7rem; min-height: 1em; text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="splash" id="splash">
+        <img class="splash-logo" src="/static/icons/axis-logo.jpg">
+        <div class="splash-title">AXIS</div>
+        <div class="splash-subtitle">Personal Operating System</div>
+        <div class="splash-progress"><div class="splash-progress-bar" id="progress-bar"></div></div>
+        <div class="splash-status" id="status">正在连接...</div>
+    </div>
+    <iframe id="app" allow="fullscreen"></iframe>
+    <script>
+        // 注销所有 Service Worker，不再注册新的
+        // SW 是之前加载卡住的根因：拦截导航请求后重建 Response 破坏了 iframe 渲染
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+                regs.forEach(function(r) { r.unregister(); });
+            });
+        }
+
+        var params = new URLSearchParams(window.location.search);
+        var sandboxId = params.get('x-cs-sandbox-id') || localStorage.getItem('axis_sandbox_id') || '';
+        var sandboxPort = params.get('x-cs-sandbox-port') || localStorage.getItem('axis_sandbox_port') || '';
+        if (sandboxId) {
+            localStorage.setItem('axis_sandbox_id', sandboxId);
+            localStorage.setItem('axis_sandbox_port', sandboxPort || '5000');
+        }
+
+        var iframe = document.getElementById('app');
+        var splash = document.getElementById('splash');
+        var statusEl = document.getElementById('status');
+        var progressBar = document.getElementById('progress-bar');
+        var retryCount = 0, maxRetries = 90, loaded = false, progress = 0;
+        var progressTimer = null, loadTimeout = null;
+
+        function setStatus(msg) { if (statusEl) statusEl.textContent = msg; }
+        function setProgress(pct) { progress = Math.min(95, Math.max(progress, pct)); if (progressBar) progressBar.style.width = progress + '%'; }
+
+        function startFakeProgress() {
+            progressTimer = setInterval(function() {
+                if (loaded) return;
+                if (progress < 50) setProgress(progress + 2);
+                else if (progress < 75) setProgress(progress + 0.8);
+                else if (progress < 90) setProgress(progress + 0.2);
+            }, 100);
+        }
+
+        function getAppUrl() {
+            if (sandboxId) return '/?x-cs-sandbox-id=' + sandboxId + '&x-cs-sandbox-port=' + (sandboxPort || '5000') + '&pwa=1';
+            return '/?pwa=1';
+        }
+
+        function tryLoad() {
+            setStatus(retryCount === 0 ? '正在连接...' : '正在唤醒工作空间 (' + retryCount + '/' + maxRetries + ')');
+            // 直接加载 iframe
+            iframe.src = getAppUrl();
+            // 后台 ping
+            fetch('/ping?_t=' + Date.now(), { method: 'GET', cache: 'no-cache', mode: 'no-cors' }).catch(function() {});
+            // 15秒超时（给页面足够时间加载 CSS/JS）
+            clearTimeout(loadTimeout);
+            loadTimeout = setTimeout(function() { if (!loaded) handleSleep(); }, 15000);
+        }
+
+        function isSleepPage(text) {
+            if (!text) return false;
+            var markers = ['未在运行', '立即启动', 'not running', '工作空间没有找到',
+                '工作空间当前未在运行', '错误码：12806', 'SandboxId', 'TraceId',
+                '重新启动', '启动超时'];
+            for (var i = 0; i < markers.length; i++) { if (text.indexOf(markers[i]) !== -1) return true; }
+            return false;
+        }
+
+        function finishLoad() {
+            if (loaded) return;
+            loaded = true;
+            clearInterval(progressTimer); clearTimeout(loadTimeout);
+            setProgress(100); setStatus('准备就绪');
+            setTimeout(function() {
+                splash.classList.add('hide');
+                setTimeout(function() { splash.style.display = 'none'; }, 600);
+            }, 300);
+            // keepalive
+            setInterval(function() { fetch('/ping?_t=' + Date.now(), { method: 'GET', cache: 'no-cache', mode: 'no-cors' }).catch(function() {}); }, 120000);
+            setInterval(function() { try { var img = new Image(); img.src = '/static/icons/favicon.png?_a=' + Date.now(); } catch(e) {} }, 30000);
+        }
+
+        function showRecoveryOptions() {
+            setStatus('连接超时，请选择操作');
+            var c = document.getElementById('rb'); if (c) c.remove();
+            c = document.createElement('div'); c.id = 'rb';
+            c.style.cssText = 'margin-top:14px;display:flex;flex-direction:column;gap:8px;align-items:center;';
+            var b1 = document.createElement('button');
+            b1.textContent = '重新连接';
+            b1.style.cssText = 'padding:9px 24px;border-radius:8px;border:none;background:#6366f1;color:#fff;font-size:13px;cursor:pointer;min-width:130px;';
+            b1.onclick = function() { c.remove(); retryCount = 0; progress = 0; startFakeProgress(); tryLoad(); };
+            c.appendChild(b1);
+            var b2 = document.createElement('button');
+            b2.textContent = '刷新页面';
+            b2.style.cssText = 'padding:9px 24px;border-radius:8px;border:1px solid rgba(255,255,255,0.3);background:transparent;color:rgba(255,255,255,0.8);font-size:13px;cursor:pointer;min-width:130px;';
+            b2.onclick = function() { window.location.reload(); };
+            c.appendChild(b2);
+            statusEl.parentNode.insertBefore(c, statusEl.nextSibling);
+        }
+
+        iframe.onload = function() {
+            // iframe 加载完成，检查是否是休眠错误页
+            try {
+                var doc = iframe.contentDocument || iframe.contentWindow.document;
+                var t = doc.body ? doc.body.innerText : '';
+                if (isSleepPage(t)) { handleSleep(); return; }
+            } catch(e) {}
+            // 正常加载完成
+            finishLoad();
+        };
+        iframe.onerror = function() { handleSleep(); };
+
+        function handleSleep() {
+            clearTimeout(loadTimeout); retryCount++;
+            if (retryCount > maxRetries) { clearInterval(progressTimer); showRecoveryOptions(); return; }
+            fetch('/ping?_t=' + Date.now(), { method: 'GET', cache: 'no-cache', mode: 'no-cors' }).catch(function() {});
+            setTimeout(function() { tryLoad(); }, 2000);
+        }
+
+        // visibilitychange
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                fetch('/ping?_t=' + Date.now(), { method: 'GET', cache: 'no-cache', mode: 'no-cors' }).catch(function() {});
+                if (loaded) {
+                    try {
+                        var doc = iframe.contentDocument || iframe.contentWindow.document;
+                        var t = doc.body ? doc.body.innerText : '';
+                        if (isSleepPage(t)) {
+                            loaded = false; splash.style.display = 'flex'; splash.classList.remove('hide');
+                            retryCount = 0; progress = 0;
+                            var rb = document.getElementById('rb'); if (rb) rb.remove();
+                            startFakeProgress(); tryLoad();
+                        }
+                    } catch(e) {
+                        loaded = false; splash.style.display = 'flex'; splash.classList.remove('hide');
+                        retryCount = 0; progress = 0;
+                        var rb = document.getElementById('rb'); if (rb) rb.remove();
+                        startFakeProgress(); tryLoad();
+                    }
+                } else if (retryCount === 0 || retryCount >= maxRetries) {
+                    retryCount = 0; progress = 0;
+                    var rb = document.getElementById('rb'); if (rb) rb.remove();
+                    startFakeProgress(); tryLoad();
+                }
+            }
+        });
+
+        startFakeProgress();
+        tryLoad();
+    </script>
+</body>
+</html>

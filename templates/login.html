@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>登录 - AXIS</title>
+    <meta name="apple-mobile-web-app-title" content="AXIS">
+    <link rel="apple-touch-icon" sizes="120x120" href="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='icons/axis-touch-120.png') }}">
+    <link rel="apple-touch-icon" sizes="167x167" href="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='icons/axis-touch-167.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='icons/axis-touch-180.png') }}">
+    <link rel="apple-touch-icon-precomposed" sizes="180x180" href="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='icons/axis-touch-180.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='icons/favicon.png') }}">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#6366f1" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+    <script>
+        (function() {
+            const theme = localStorage.getItem('theme') || 'auto';
+            const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const isDark = theme === 'dark' || (theme === 'auto' && sysDark);
+            if (isDark) document.documentElement.setAttribute('data-theme', 'dark');
+        })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script>tailwind.config = { darkMode: 'class' }</script>
+</head>
+<body class="bg-app min-h-dvh flex items-center justify-center">
+
+<div class="w-full max-w-sm mx-auto p-6">
+    <!-- Logo -->
+    <div class="text-center mb-8">
+        <img src="{{ url_for('static', filename='icons/axis-logo.jpg') }}" alt="AXIS" class="w-16 h-16 rounded-2xl mx-auto mb-3 shadow-lg">
+        <h1 class="text-xl axis-logo-text text-main">AXIS</h1>
+        <p class="text-xs text-muted mt-1">Personal Operating System 3.0</p>
+    </div>
+
+    <!-- 登录/注册切换 -->
+    <div class="theme-toggle mb-5" style="display:flex;">
+        <button class="theme-btn flex-1 text-center active" id="tab-login" onclick="switchTab('login')">登录</button>
+        <button class="theme-btn flex-1 text-center" id="tab-register" onclick="switchTab('register')">注册</button>
+    </div>
+
+    {% if error %}
+    <div class="rounded-lg p-3 mb-4 text-sm text-center" style="background:var(--tag-red-bg);color:var(--tag-red-text);">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <!-- 登录表单 -->
+    <form id="form-login" method="POST" action="{{ url_for('login') }}" class="space-y-3">
+        <div>
+            <label class="form-label">邮箱</label>
+            <input type="email" name="email" required class="form-input" placeholder="your@email.com" autofocus>
+        </div>
+        <div>
+            <label class="form-label">密码</label>
+            <input type="password" name="password" required class="form-input" placeholder="••••••••">
+        </div>
+        <div class="flex items-center gap-2">
+            <input type="checkbox" name="remember" id="remember" class="rounded">
+            <label for="remember" class="text-xs text-sub">保持登录状态</label>
+        </div>
+        <input type="hidden" name="next" value="{{ next or '' }}">
+        <button type="submit" class="btn btn-primary w-full">登录</button>
+    </form>
+
+    <!-- 注册表单 -->
+    <form id="form-register" method="POST" action="{{ url_for('register') }}" class="space-y-3 hidden">
+        <div>
+            <label class="form-label">姓名</label>
+            <input type="text" name="name" class="form-input" placeholder="你的名字">
+        </div>
+        <div>
+            <label class="form-label">邮箱</label>
+            <input type="email" name="email" required class="form-input" placeholder="your@email.com">
+        </div>
+        <div>
+            <label class="form-label">密码</label>
+            <input type="password" name="password" required class="form-input" placeholder="至少6位" minlength="6">
+        </div>
+        <button type="submit" class="btn btn-primary w-full">注册</button>
+    </form>
+
+    <p class="text-xs text-muted text-center mt-6">
+        登录后所有数据将自动在 iPhone / iPad / Mac 间同步
+    </p>
+</div>
+
+<script>
+function switchTab(tab) {
+    const loginForm = document.getElementById('form-login');
+    const registerForm = document.getElementById('form-register');
+    const loginTab = document.getElementById('tab-login');
+    const registerTab = document.getElementById('tab-register');
+
+    if (tab === 'login') {
+        loginForm.classList.remove('hidden');
+        registerForm.classList.add('hidden');
+        loginTab.classList.add('active');
+        registerTab.classList.remove('active');
+    } else {
+        loginForm.classList.add('hidden');
+        registerForm.classList.remove('hidden');
+        loginTab.classList.remove('active');
+        registerTab.classList.add('active');
+    }
+}
+</script>
+</body>
+</html>

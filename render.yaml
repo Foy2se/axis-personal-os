@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: axis-personal-os
+    env: docker
+    plan: standard
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DB_PATH
+        value: /data/personal_os.db
+      - key: SECRET_KEY
+        generateValue: true
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 10000
+    disk:
+      name: axis-data
+      mountPath: /data
+      sizeGB: 1
