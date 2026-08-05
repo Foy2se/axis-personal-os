@@ -29,3 +29,8 @@ Thumbs.db
 
 # WorkBuddy internal memory (keep out of repo)
 .workbuddy/
+
+# Node (only used locally to build Tailwind; not shipped)
+node_modules/
+package-lock.json
+package.json
