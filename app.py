@@ -1788,6 +1788,32 @@ def settings_save():
     return redirect(url_for('settings'))
 
 
+@app.route('/settings/profile', methods=['POST'])
+@login_required
+def settings_profile():
+    """更新账号邮箱与姓名"""
+    uid = get_user_id()
+    new_name = request.form.get('name', '').strip()
+    new_email = request.form.get('email', '').strip()
+    if not new_email:
+        return redirect(url_for('settings', msg='error|邮箱不能为空'))
+    db = get_db()
+    # 邮箱唯一性检查（排除自己）
+    clash = db.execute(
+        "SELECT id FROM users WHERE email = ? AND id != ?", (new_email, uid)
+    ).fetchone()
+    if clash:
+        db.close()
+        return redirect(url_for('settings', msg='error|该邮箱已被其他账号使用'))
+    db.execute(
+        "UPDATE users SET name = ?, email = ? WHERE id = ?",
+        (new_name, new_email, uid),
+    )
+    db.commit()
+    db.close()
+    return redirect(url_for('settings', msg='success|账号信息已更新'))
+
+
 @app.route('/export')
 def export_data():
     """导出全量JSON备份"""
