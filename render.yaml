@@ -1,19 +1,23 @@
+# Render 部署配置（免费套餐版）
+# 说明：原配置使用 env: docker + plan: standard（均为付费）。
+# 已改为 Python 构建 + free 套餐，可在免费额度内部署。
+# 注意：free 套餐无持久磁盘，数据库在「重新部署」后会重置；
+#       若需长期保存数据，请把 plan 改回 standard 并加回 disk 配置。
 services:
   - type: web
     name: axis-personal-os
-    env: docker
-    plan: standard
-    dockerfilePath: ./Dockerfile
+    env: python
+    plan: free
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
     envVars:
       - key: DB_PATH
-        value: /data/personal_os.db
+        value: ./personal_os.db
       - key: SECRET_KEY
         generateValue: true
       - key: HOST
         value: 0.0.0.0
       - key: PORT
         value: 10000
-    disk:
-      name: axis-data
-      mountPath: /data
-      sizeGB: 1
+    healthCheckPath: /
