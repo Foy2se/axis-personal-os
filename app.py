@@ -24,13 +24,16 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'personal-os-v3-secret')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
-# 静态文件添加 no-cache 头，避免 PWA 图标缓存
+# 静态文件缓存策略：图标不缓存（便于更新）；其余静态资源缓存 10 分钟，加速重复访问
 @app.after_request
 def add_header(response):
-    if request.path.startswith('/static/icons/'):
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
+    if request.path.startswith('/static/'):
+        if request.path.startswith('/static/icons/'):
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+        else:
+            response.headers['Cache-Control'] = 'public, max-age=600'
     return response
 
 # 启动时初始化数据库
