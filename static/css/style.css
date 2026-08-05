@@ -1,7 +1,5 @@
 /* AXIS Personal OS 3.0 - 主题变量系统 + 自定义样式 */
-
-/* 引入 AXIS 品牌字体：Montserrat（最接近 splash 图风格） */
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
+/* 品牌字体 Montserrat 已在 base.html 中以非阻塞方式加载，这里不再 @import（避免阻塞渲染） */
 
 /* AXIS 品牌文字样式 — 精致大写、中等间距、轻字重 */
 .axis-logo-text {
