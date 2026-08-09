@@ -236,7 +236,7 @@
                 <span class="text-xl sm:text-2xl">＋</span>
                 <span class="text-xs font-medium">任务</span>
             </button>
-            <button onclick="openModal('modal-inbox')" class="quick-btn flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl bg-yellow-50 text-yellow-600">
+            <button onclick="openModal('modal-quick-inbox')" class="quick-btn flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl bg-yellow-50 text-yellow-600">
                 <span class="text-xl sm:text-2xl">💡</span>
                 <span class="text-xs font-medium">想法</span>
             </button>
@@ -292,11 +292,11 @@
 </div>
 
 <!-- 快速记录灵感模态框 -->
-<div id="modal-inbox" class="modal-overlay hidden">
+<div id="modal-quick-inbox" class="modal-overlay hidden" data-modal>
     <div class="modal-content">
         <div class="flex items-center justify-between mb-4">
             <h3 class="font-semibold text-lg">快速记录想法</h3>
-            <button onclick="closeModal('modal-inbox')" class="text-muted hover:text-sub">✕</button>
+            <button type="button" onclick="closeModal('modal-quick-inbox')" class="modal-close-btn" aria-label="关闭">✕</button>
         </div>
         <form method="POST" action="{{ url_for('inbox_quick_add') }}" class="space-y-3">
             <div>
@@ -307,7 +307,10 @@
                 <label class="form-label">内容</label>
                 <textarea name="content" rows="4" required class="form-input" placeholder="记录你的想法..."></textarea>
             </div>
-            <button type="submit" class="btn btn-primary w-full">保存想法</button>
+            <div class="flex gap-3">
+                <button type="button" onclick="closeModal('modal-quick-inbox')" class="btn btn-secondary flex-1">取消</button>
+                <button type="submit" class="btn btn-primary flex-1">保存想法</button>
+            </div>
         </form>
     </div>
 </div>
