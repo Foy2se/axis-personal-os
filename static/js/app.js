@@ -77,16 +77,27 @@ function toggleSidebar() {
 // ===================== 模态框 =====================
 
 function openModal(id) {
-    document.getElementById(id).classList.remove('hidden');
+    var el = document.getElementById(id);
+    if (el) el.classList.remove('hidden');
 }
 function closeModal(id) {
-    document.getElementById(id).classList.add('hidden');
+    var el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
 }
 
 // 点击遮罩关闭模态框
-document.addEventListener('click', (e) => {
+document.addEventListener('click', function(e) {
     if (e.target.classList && e.target.classList.contains('modal-overlay')) {
         e.target.classList.add('hidden');
+    }
+});
+
+// 按 ESC 键关闭所有打开的模态框
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' || e.keyCode === 27) {
+        document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(function(m) {
+            m.classList.add('hidden');
+        });
     }
 });
 
