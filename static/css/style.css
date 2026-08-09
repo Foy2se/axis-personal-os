@@ -486,6 +486,12 @@ body {
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
 }
+/* 高优先级覆盖：style.css 在 tailwind.css 之后加载，
+   否则 .modal-overlay 的 display:flex 会盖掉 .hidden 的 display:none，
+   导致弹窗永远显示且关不掉 */
+.modal-overlay.hidden {
+    display: none;
+}
 .modal-content {
     background: var(--card-bg);
     border-radius: 12px;
