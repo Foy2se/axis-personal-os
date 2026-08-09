@@ -50,11 +50,11 @@
 </div>
 
 <!-- 新建灵感模态框 -->
-<div id="modal-inbox" class="modal-overlay hidden">
+<div id="modal-inbox" class="modal-overlay hidden" data-modal>
     <div class="modal-content">
         <div class="flex items-center justify-between mb-4">
             <h3 class="font-semibold text-lg">记录想法</h3>
-            <button onclick="closeModal('modal-inbox')" class="text-muted hover:text-sub">✕</button>
+            <button type="button" onclick="closeModal('modal-inbox')" class="modal-close-btn" aria-label="关闭">✕</button>
         </div>
         <form method="POST" action="{{ url_for('inbox_add') }}" class="space-y-3">
             <div>
@@ -75,7 +75,10 @@
                     <input type="text" name="tags" class="form-input" placeholder="如：创意, 商业">
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary w-full">保存想法</button>
+            <div class="flex gap-3">
+                <button type="button" onclick="closeModal('modal-inbox')" class="btn btn-secondary flex-1">取消</button>
+                <button type="submit" class="btn btn-primary flex-1">保存想法</button>
+            </div>
         </form>
     </div>
 </div>
@@ -121,6 +124,13 @@ function editInbox(id, title, content, source, tags) {
     document.getElementById('ei-tags').value = tags || '';
     openModal('modal-edit-inbox');
 }
+
+// 支持 /inbox?auto=1 自动打开新建弹窗（用于 PWA 快捷方式「记录想法」）
+(function() {
+    if (new URLSearchParams(window.location.search).get('auto') === '1') {
+        openModal('modal-inbox');
+    }
+})();
 </script>
 {% endblock %}
 {% endblock %}
