@@ -498,6 +498,27 @@ body {
     box-shadow: var(--shadow-lg);
     border: 1px solid var(--border);
 }
+.modal-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px;
+    margin: -8px -8px -8px 0;
+    border-radius: 8px;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+.modal-close-btn:hover,
+.modal-close-btn:active {
+    color: var(--text-secondary);
+    background: var(--sidebar-hover);
+}
 
 /* ========== 日历格子 ========== */
 .cal-day {
