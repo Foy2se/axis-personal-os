@@ -160,7 +160,7 @@
     <div class="modal-content">
         <div class="flex items-center justify-between mb-4">
             <h3 class="font-semibold text-lg">添加日历事件</h3>
-            <button onclick="closeModal('modal-event')" class="text-muted hover:text-sub">✕</button>
+            <button type="button" onclick="closeModal('modal-event')" class="modal-close-btn" aria-label="关闭">✕</button>
         </div>
         <form method="POST" action="{{ url_for('calendar_event_add') }}" class="space-y-3">
             <div>
