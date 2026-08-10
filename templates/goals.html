@@ -5,7 +5,10 @@
 <div class="space-y-4">
     <div class="flex items-center justify-between flex-wrap gap-3">
         <h1 class="text-2xl font-bold text-main">🎯 目标规划</h1>
-        <button onclick="openModal('modal-goal')" class="btn btn-primary">+ 新建目标</button>
+        <div class="flex items-center gap-2">
+            <button onclick="openManageCategories('goals')" class="btn btn-secondary text-sm">⚙ 管理分类</button>
+            <button onclick="openModal('modal-goal')" class="btn btn-primary">+ 新建目标</button>
+        </div>
     </div>
 
     <!-- 结构说明 -->
@@ -23,17 +26,20 @@
     </div>
 
     <!-- 按层级展示 -->
-    {% for level in ['年度目标', '阶段目标', '月度计划', '行动'] %}
-    {% if level in goal_tree %}
+    {% for level in goal_categories %}
     <div class="bg-card rounded-xl border border-app p-5">
-        <h2 class="font-semibold text-main mb-3 flex items-center gap-2">
-            {% if level == '年度目标' %}🎯{% elif level == '阶段目标' %}📍{% elif level == '月度计划' %}📋{% else %}⚡{% endif %}
-            {{ level }}（{{ goal_tree[level]|length }}）
+        <h2 class="font-semibold text-main mb-3 flex items-center justify-between">
+            <span class="flex items-center gap-2">
+                {% if level == '年度目标' %}🎯{% elif level == '阶段目标' %}📍{% elif level == '月度计划' %}📋{% else %}⚡{% endif %}
+                {{ level }}（{{ goal_tree[level]|length }}）
+            </span>
+            {% if level != '未分类' %}<span class="text-xs text-muted">拖拽 ⠿ 可排序</span>{% endif %}
         </h2>
-        <div class="space-y-2">
+        <div class="space-y-2 goal-sortable" data-module="goals" data-level="{{ level }}">
             {% for g in goal_tree[level] %}
-            <div class="flex items-center gap-3 p-3 rounded-lg bg-hover hover:bg-hover">
-                <div class="flex-1">
+            <div class="flex items-center gap-2 p-3 rounded-lg bg-hover hover:bg-hover" data-id="{{ g['id'] }}">
+                <span class="drag-handle" data-drag-handle title="拖拽排序">⠿</span>
+                <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
                         <span class="font-medium text-main text-sm">{{ g['name'] }}</span>
                         <span class="text-xs px-1.5 py-0.5 rounded
@@ -55,17 +61,18 @@
                         <span class="text-xs text-sub w-10">{{ g['progress'] }}%</span>
                     </div>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-shrink-0">
                     <button onclick='editGoal({{ g['id']|tojson }}, {{ g['name']|tojson }}, {{ g['description']|tojson }}, {{ g['level']|tojson }}, {{ g['period']|tojson }}, {{ g['status']|tojson }}, {{ g['progress']|tojson }})' class="text-xs text-primary hover:underline">编辑</button>
                     <form method="POST" action="{{ url_for('goal_delete', gid=g['id']) }}" class="inline" onsubmit="return confirmDelete('确定删除此目标？')">
                         <button type="submit" class="text-xs text-red-500 hover:underline">删除</button>
                     </form>
                 </div>
             </div>
+            {% else %}
+            <p class="text-xs text-muted py-2">暂无目标</p>
             {% endfor %}
         </div>
     </div>
-    {% endif %}
     {% endfor %}
 
     {% if not goal_tree %}
@@ -92,8 +99,8 @@
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="form-label">层级</label>
-                    <select name="level" class="form-input">
-                        <option>年度目标</option><option>阶段目标</option><option>月度计划</option><option>行动</option>
+                    <select name="level" id="goal-level-select" class="form-input">
+                        {% for c in goal_categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
                     </select>
                 </div>
                 <div>
@@ -138,7 +145,7 @@
                 <div>
                     <label class="form-label">层级</label>
                     <select name="level" id="eg-level" class="form-input">
-                        <option>年度目标</option><option>阶段目标</option><option>月度计划</option><option>行动</option>
+                        {% for c in goal_categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
                     </select>
                 </div>
                 <div>
@@ -163,7 +170,24 @@
     </div>
 </div>
 
+<!-- 管理分类模态框（目标层级） -->
+<div id="modal-manage-cats" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg" id="manage-cats-title">管理分类</h3>
+            <button type="button" onclick="closeModal('modal-manage-cats')" class="modal-close-btn" aria-label="关闭">✕</button>
+        </div>
+        <p class="text-xs text-muted mb-3">添加或删除分类。删除后，相关目标会归入「未分类」。</p>
+        <div id="manage-cats-list" class="space-y-2 mb-3"></div>
+        <form id="manage-cats-add-form" class="flex gap-2">
+            <input type="text" id="manage-cats-input" class="form-input" placeholder="新分类名称" maxlength="20">
+            <button type="submit" class="btn btn-primary whitespace-nowrap">添加</button>
+        </form>
+    </div>
+</div>
+
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/sortable.min.js') }}"></script>
 <script>
 function editGoal(id, name, desc, level, period, status, progress) {
     document.getElementById('form-edit-goal').action = '/goals/' + id + '/update';
@@ -174,6 +198,113 @@ function editGoal(id, name, desc, level, period, status, progress) {
     document.getElementById('eg-status').value = status || '进行中';
     document.getElementById('eg-progress').value = progress || 0;
     openModal('modal-edit-goal');
+}
+
+// ===== 拖拽排序（目标） =====
+document.querySelectorAll('.goal-sortable').forEach(function (container) {
+    Sortable.create(container, {
+        handle: '[data-drag-handle]',
+        animation: 150,
+        ghostClass: 'dragging',
+        onEnd: function () {
+            var ids = Array.from(container.children)
+                .filter(function (el) { return el.dataset.id; })
+                .map(function (el) { return parseInt(el.dataset.id, 10); });
+            fetch('/api/goals/reorder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: ids })
+            });
+        }
+    });
+});
+
+// ===== 自定义分类管理（goals 与 evening_plan 共用） =====
+var currentCatModule = '';
+function openManageCategories(module) {
+    currentCatModule = module;
+    document.getElementById('manage-cats-title').textContent =
+        (module === 'goals' ? '目标层级' : '计划分类') + '管理';
+    renderCategoryManager();
+    openModal('modal-manage-cats');
+}
+function renderCategoryManager() {
+    fetch('/api/categories?module=' + currentCatModule)
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            var list = document.getElementById('manage-cats-list');
+            list.innerHTML = '';
+            d.categories.forEach(function (name) {
+                var row = document.createElement('div');
+                row.className = 'flex items-center justify-between p-2 rounded-lg bg-hover';
+                var span = document.createElement('span');
+                span.textContent = name;
+                span.className = 'text-sm text-main';
+                var btn = document.createElement('button');
+                if (name === '未分类') {
+                    btn.textContent = '系统';
+                    btn.className = 'text-xs text-muted';
+                    btn.disabled = true;
+                } else {
+                    btn.textContent = '删除';
+                    btn.className = 'text-xs text-red-500 hover:underline';
+                    btn.onclick = function () { deleteCategory(name); };
+                }
+                row.appendChild(span);
+                row.appendChild(btn);
+                list.appendChild(row);
+            });
+        });
+}
+function deleteCategory(name) {
+    if (!confirm('确定删除分类「' + name + '」？相关目标会归入「未分类」。')) return;
+    fetch('/api/categories/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ module: currentCatModule, name: name })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+        if (d.ok) { renderCategoryManager(); refreshCategorySelects(); }
+        else { alert(d.error); }
+    });
+}
+document.getElementById('manage-cats-add-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var input = document.getElementById('manage-cats-input');
+    var name = input.value.trim();
+    if (!name) return;
+    fetch('/api/categories/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ module: currentCatModule, name: name })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+        if (d.ok) { input.value = ''; renderCategoryManager(); refreshCategorySelects(); }
+        else { alert(d.error); }
+    });
+});
+function refreshCategorySelects() {
+    fetch('/api/categories?module=goals').then(function (r) { return r.json(); }).then(function (d) {
+        rebuildSelect('goal-level-select', d.categories);
+        rebuildSelect('eg-level', d.categories);
+    });
+    fetch('/api/categories?module=evening_plan').then(function (r) { return r.json(); }).then(function (d) {
+        rebuildSelect('plan-category-select', d.categories);
+    });
+}
+function rebuildSelect(id, cats) {
+    var sel = document.getElementById(id);
+    if (!sel) return;
+    var cur = sel.value;
+    sel.innerHTML = '';
+    cats.forEach(function (c) {
+        var o = document.createElement('option');
+        o.value = c; o.textContent = c;
+        sel.appendChild(o);
+    });
+    if (cats.indexOf(cur) !== -1) sel.value = cur;
 }
 </script>
 {% endblock %}
