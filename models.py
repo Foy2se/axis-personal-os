@@ -14,7 +14,8 @@ CONTENT_TABLES = [
     'daily_health', 'cases', 'methodologies', 'viewpoints',
     'calendar_events', 'evening_plans',
     'decision_logs', 'body_rhythm', 'weather_cache',
-    'daily_loop_state', 'ai_insights', 'maintenance_items'
+    'daily_loop_state', 'ai_insights', 'maintenance_items',
+    'plan_categories'
 ]
 
 
@@ -385,6 +386,16 @@ def init_db():
         status TEXT DEFAULT 'active',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS plan_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER DEFAULT 1,
+        module TEXT NOT NULL,
+        name TEXT NOT NULL,
+        sort_order INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, module, name)
+    );
     """)
 
     # 4. 迁移：为已存在的表添加 user_id 列（如果还没有）
@@ -409,6 +420,8 @@ def init_db():
         ("daily_health", "mood_score", "INTEGER"),
         ("daily_health", "mood_note", "TEXT"),
         ("inbox", "ai_category", "TEXT"),
+        ("goals", "sort_order", "INTEGER DEFAULT 0"),
+        ("evening_plans", "sort_order", "INTEGER DEFAULT 0"),
     ]
     for table, col, dtype in migrations:
         try:
@@ -440,6 +453,45 @@ def init_db():
 
     db.commit()
     db.close()
+
+
+# ===================== 计划自定义分类 =====================
+# 各「计划」模块使用的自定义分类。goals 的 level、evening_plans 的 category 都复用这套分类。
+DEFAULT_CATEGORIES = {
+    'goals': ['年度目标', '阶段目标', '月度计划', '行动'],
+    'evening_plan': ['工作延续', '学习成长', '生活事项', '兴趣娱乐'],
+}
+# 系统保留分类：删除其它分类时，相关项会归到此处；不可被删除
+SYSTEM_CATEGORY = '未分类'
+
+
+def get_categories(uid, module):
+    """获取某模块的分类列表（按 sort_order 排序）。若该用户尚无分类，自动写入默认值。"""
+    db = get_db()
+    rows = db.execute(
+        "SELECT name, sort_order FROM plan_categories WHERE user_id=? AND module=? ORDER BY sort_order ASC, id ASC",
+        (uid, module)
+    ).fetchall()
+    if not rows:
+        # 首次使用：写入默认分类
+        defaults = DEFAULT_CATEGORIES.get(module, [])
+        for i, name in enumerate(defaults):
+            db.execute(
+                "INSERT OR IGNORE INTO plan_categories (user_id, module, name, sort_order) VALUES (?, ?, ?, ?)",
+                (uid, module, name, i)
+            )
+        # 确保系统分类存在（置于末尾）
+        db.execute(
+            "INSERT OR IGNORE INTO plan_categories (user_id, module, name, sort_order) VALUES (?, ?, ?, ?)",
+            (uid, module, SYSTEM_CATEGORY, 999)
+        )
+        db.commit()
+        rows = db.execute(
+            "SELECT name, sort_order FROM plan_categories WHERE user_id=? AND module=? ORDER BY sort_order ASC, id ASC",
+            (uid, module)
+        ).fetchall()
+    db.close()
+    return [r['name'] for r in rows]
 
 
 if __name__ == '__main__':
