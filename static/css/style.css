@@ -483,8 +483,8 @@ body {
     padding-bottom: calc(1rem + env(safe-area-inset-bottom));
     padding-left: calc(1rem + env(safe-area-inset-left));
     padding-right: calc(1rem + env(safe-area-inset-right));
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    /* 注意：移除 backdrop-filter: blur —— iOS Safari 上每次弹窗显示/隐藏
+       都会触发全屏重绘合成，是手机端卡顿主因。半透明遮罩 var(--overlay) 已足够 */
 }
 /* 高优先级覆盖：style.css 在 tailwind.css 之后加载，
    否则 .modal-overlay 的 display:flex 会盖掉 .hidden 的 display:none，
