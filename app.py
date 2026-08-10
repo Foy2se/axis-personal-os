@@ -1,6 +1,6 @@
 """Personal OS V3.0 - Flask 主应用（账号系统+多设备同步+多格式导出）"""
 from flask import Flask, render_template, request, redirect, url_for, jsonify, Response, send_file, session
-from models import get_db, init_db, CONTENT_TABLES
+from models import get_db, init_db, CONTENT_TABLES, get_categories, SYSTEM_CATEGORY
 from auth import (hash_password, verify_password, create_session, destroy_session,
                   get_current_user, login_required, get_user_id)
 from utils import (today_str, now_str, calculate_next_date, get_week_range,
@@ -908,11 +908,13 @@ def note_delete(nid):
 def goals():
     uid = get_user_id()
     db = get_db()
-    # 获取层级结构
-    all_goals = db.execute("SELECT * FROM goals WHERE user_id = ? ORDER BY level, created_at DESC", (uid,)).fetchall()
+    # 获取自定义分类（层级），按排序字段排列
+    goal_categories = get_categories(uid, 'goals')
+    # 按 sort_order 取全部目标，分组时保持排序
+    all_goals = db.execute("SELECT * FROM goals WHERE user_id = ? ORDER BY sort_order ASC, created_at DESC", (uid,)).fetchall()
 
-    # 构建树结构
-    goal_tree = {}
+    # 构建树结构（仅保留自定义分类下的目标，其余归入对应层级）
+    goal_tree = {c: [] for c in goal_categories}
     for g in all_goals:
         level = g['level']
         if level not in goal_tree:
@@ -924,6 +926,7 @@ def goals():
     return render_template('goals.html',
         active_page='goals',
         goal_tree=goal_tree,
+        goal_categories=goal_categories,
         all_goals=all_goals)
 
 
@@ -932,16 +935,20 @@ def goal_add():
     uid = get_user_id()
     db = get_db()
     parent_id = request.form.get('parent_id') or None
+    cats = get_categories(uid, 'goals')
+    level = request.form.get('level') or (cats[0] if cats else '年度目标')
+    max_so = db.execute("SELECT COALESCE(MAX(sort_order), 0) FROM goals WHERE user_id = ?", (uid,)).fetchone()[0]
     db.execute(
-        "INSERT INTO goals (user_id, name, description, level, parent_id, period, status, progress) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO goals (user_id, name, description, level, parent_id, period, status, progress, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (uid,
          request.form['name'],
          request.form.get('description', ''),
-         request.form.get('level', '年度目标'),
+         level,
          parent_id,
          request.form.get('period', ''),
          request.form.get('status', '进行中'),
-         int(request.form.get('progress', 0) or 0))
+         int(request.form.get('progress', 0) or 0),
+         max_so + 1)
     )
     db.commit()
     db.close()
@@ -974,6 +981,100 @@ def goal_delete(gid):
     db.commit()
     db.close()
     return redirect(url_for('goals'))
+
+
+# ===================== 计划自定义分类 / 排序 API =====================
+@app.route('/api/categories')
+def api_categories():
+    """获取某模块的分类列表（JSON）"""
+    uid = get_user_id()
+    module = request.args.get('module', '')
+    return jsonify({'categories': get_categories(uid, module)})
+
+
+@app.route('/api/categories/add', methods=['POST'])
+def api_categories_add():
+    """新增自定义分类"""
+    uid = get_user_id()
+    data = request.get_json(force=True, silent=True) or {}
+    module = data.get('module', '')
+    name = (data.get('name') or '').strip()
+    if not name or name == SYSTEM_CATEGORY:
+        return jsonify({'ok': False, 'error': '分类名称无效'}), 400
+    db = get_db()
+    exist = db.execute(
+        "SELECT 1 FROM plan_categories WHERE user_id=? AND module=? AND name=?",
+        (uid, module, name)
+    ).fetchone()
+    if exist:
+        db.close()
+        return jsonify({'ok': False, 'error': '分类已存在'}), 400
+    max_so = db.execute(
+        "SELECT COALESCE(MAX(sort_order), 0) FROM plan_categories WHERE user_id=? AND module=?",
+        (uid, module)
+    ).fetchone()[0]
+    db.execute(
+        "INSERT INTO plan_categories (user_id, module, name, sort_order) VALUES (?, ?, ?, ?)",
+        (uid, module, name, max_so + 1)
+    )
+    db.commit()
+    db.close()
+    return jsonify({'ok': True, 'categories': get_categories(uid, module)})
+
+
+@app.route('/api/categories/delete', methods=['POST'])
+def api_categories_delete():
+    """删除自定义分类（相关项归到系统分类「未分类」）"""
+    uid = get_user_id()
+    data = request.get_json(force=True, silent=True) or {}
+    module = data.get('module', '')
+    name = (data.get('name') or '').strip()
+    if name == SYSTEM_CATEGORY:
+        return jsonify({'ok': False, 'error': '系统分类不可删除'}), 400
+    db = get_db()
+    if module == 'goals':
+        db.execute("UPDATE goals SET level=? WHERE user_id=? AND level=?", (SYSTEM_CATEGORY, uid, name))
+    elif module == 'evening_plan':
+        db.execute("UPDATE evening_plans SET category=? WHERE user_id=? AND category=?", (SYSTEM_CATEGORY, uid, name))
+    db.execute(
+        "DELETE FROM plan_categories WHERE user_id=? AND module=? AND name=?",
+        (uid, module, name)
+    )
+    db.commit()
+    db.close()
+    return jsonify({'ok': True, 'categories': get_categories(uid, module)})
+
+
+@app.route('/api/goals/reorder', methods=['POST'])
+def goals_reorder():
+    """保存目标排序（拖拽后调用）"""
+    uid = get_user_id()
+    data = request.get_json(force=True, silent=True) or {}
+    ids = data.get('ids', [])
+    db = get_db()
+    for i, gid in enumerate(ids):
+        db.execute("UPDATE goals SET sort_order=? WHERE id=? AND user_id=?", (i, gid, uid))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/evening-plan/reorder', methods=['POST'])
+def evening_plan_reorder():
+    """保存今晚计划排序（拖拽后调用，按日期隔离）"""
+    uid = get_user_id()
+    data = request.get_json(force=True, silent=True) or {}
+    ids = data.get('ids', [])
+    plan_date = data.get('date')
+    db = get_db()
+    for i, pid in enumerate(ids):
+        db.execute(
+            "UPDATE evening_plans SET sort_order=? WHERE id=? AND user_id=? AND plan_date=?",
+            (i, pid, uid, plan_date)
+        )
+    db.commit()
+    db.close()
+    return jsonify({'ok': True})
 
 
 # ===================== 月度计划 =====================
@@ -1925,8 +2026,11 @@ def evening_plan():
     view_date = request.args.get('date', today)
     from_context = request.args.get('from', '')  # worklog 等来源引导
 
+    # 自定义分类
+    plan_categories = get_categories(uid, 'evening_plan')
+
     today_plans = db.execute(
-        "SELECT * FROM evening_plans WHERE plan_date = ? AND user_id = ? ORDER BY priority DESC, created_at ASC",
+        "SELECT * FROM evening_plans WHERE plan_date = ? AND user_id = ? ORDER BY sort_order ASC, created_at ASC",
         (view_date, uid)
     ).fetchall()
 
@@ -1948,6 +2052,7 @@ def evening_plan():
     return render_template('evening_plan.html',
         active_page='evening_plan',
         plans=today_plans,
+        plan_categories=plan_categories,
         view_date=view_date,
         today=today,
         pending=pending,
@@ -1961,13 +2066,20 @@ def evening_plan_add():
     uid = get_user_id()
     db = get_db()
     plan_date = request.form.get('plan_date', today_str())
+    cats = get_categories(uid, 'evening_plan')
+    category = request.form.get('category') or (cats[0] if cats else '未分类')
+    max_so = db.execute(
+        "SELECT COALESCE(MAX(sort_order), 0) FROM evening_plans WHERE user_id = ? AND plan_date = ?",
+        (uid, plan_date)
+    ).fetchone()[0]
     db.execute(
-        "INSERT INTO evening_plans (user_id, plan_date, name, category, estimated_time, priority, status) VALUES (?, ?, ?, ?, ?, ?, '待执行')",
+        "INSERT INTO evening_plans (user_id, plan_date, name, category, estimated_time, priority, status, sort_order) VALUES (?, ?, ?, ?, ?, ?, '待执行', ?)",
         (uid, plan_date,
          request.form['name'],
-         request.form.get('category', '兴趣娱乐'),
+         category,
          request.form.get('estimated_time') or None,
-         request.form.get('priority', '中'))
+         request.form.get('priority', '中'),
+         max_so + 1)
     )
     db.commit()
     db.close()
@@ -2058,13 +2170,15 @@ def evening_plan_quick():
     uid = get_user_id()
     db = get_db()
     plan_date = request.form.get('plan_date', today_str())
+    cats = get_categories(uid, 'evening_plan')
+    default_cat = cats[0] if cats else '未分类'
     names = request.form.getlist('names')
     for name in names:
         name = name.strip()
         if name:
             db.execute(
                 "INSERT INTO evening_plans (user_id, plan_date, name, category, priority, status) VALUES (?, ?, ?, ?, ?, '待执行')",
-                (uid, plan_date, name, '兴趣娱乐', '中')
+                (uid, plan_date, name, default_cat, '中')
             )
     db.commit()
     db.close()
