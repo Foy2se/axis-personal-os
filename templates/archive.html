@@ -102,7 +102,7 @@
     <div class="modal-content">
         <div class="flex items-center justify-between mb-4">
             <h3 class="font-semibold text-lg">添加案例</h3>
-            <button onclick="closeModal('modal-case')" class="text-muted hover:text-sub">✕</button>
+            <button type="button" onclick="closeModal('modal-case')" class="modal-close-btn" aria-label="关闭">✕</button>
         </div>
         <form method="POST" action="{{ url_for('archive_case_add') }}" class="space-y-3">
             <div><label class="form-label">案例名称</label><input type="text" name="name" required class="form-input"></div>
@@ -122,7 +122,7 @@
     <div class="modal-content" style="max-width: 640px;">
         <div class="flex items-center justify-between mb-4">
             <h3 class="font-semibold text-lg">添加方法论</h3>
-            <button onclick="closeModal('modal-method')" class="text-muted hover:text-sub">✕</button>
+            <button type="button" onclick="closeModal('modal-method')" class="modal-close-btn" aria-label="关闭">✕</button>
         </div>
         <form method="POST" action="{{ url_for('archive_method_add') }}" class="space-y-3">
             <div><label class="form-label">标题</label><input type="text" name="title" required class="form-input"></div>
@@ -138,7 +138,7 @@
     <div class="modal-content" style="max-width: 640px;">
         <div class="flex items-center justify-between mb-4">
             <h3 class="font-semibold text-lg">添加观点</h3>
-            <button onclick="closeModal('modal-view')" class="text-muted hover:text-sub">✕</button>
+            <button type="button" onclick="closeModal('modal-view')" class="modal-close-btn" aria-label="关闭">✕</button>
         </div>
         <form method="POST" action="{{ url_for('archive_viewpoint_add') }}" class="space-y-3">
             <div><label class="form-label">标题</label><input type="text" name="title" required class="form-input"></div>
