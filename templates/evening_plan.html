@@ -8,7 +8,10 @@
             <h1 class="text-2xl font-bold text-main">🌙 今晚计划</h1>
             <p class="text-sm text-sub mt-1">{{ view_date }}{% if view_date == today %} · 今天{% endif %}</p>
         </div>
-        <button onclick="openModal('modal-plan')" class="btn btn-primary">+ 添加计划</button>
+        <div class="flex items-center gap-2">
+            <button onclick="openManageCategories('evening_plan')" class="btn btn-secondary text-sm">⚙ 管理分类</button>
+            <button onclick="openModal('modal-plan')" class="btn btn-primary">+ 添加计划</button>
+        </div>
     </div>
 
     <!-- 工作日志完成后的引导提示 -->
@@ -77,10 +80,11 @@
         </div>
 
         {% if plans %}
-        <div class="space-y-2">
+        <div class="space-y-2 plan-sortable" data-date="{{ view_date }}">
             {% for p in plans %}
-            <div class="flex items-start gap-3 p-3 rounded-lg border border-app
-                {% if p['status'] == '已完成' %}opacity-60{% elif p['status'] == '已放弃' %}opacity-40{% elif p['status'] == '已延后' %}opacity-50{% else %}bg-hover{% endif %}">
+            <div class="flex items-start gap-2 p-3 rounded-lg border border-app
+                {% if p['status'] == '已完成' %}opacity-60{% elif p['status'] == '已放弃' %}opacity-40{% elif p['status'] == '已延后' %}opacity-50{% else %}bg-hover{% endif %}" data-id="{{ p['id'] }}">
+                <span class="drag-handle pt-1" data-drag-handle title="拖拽排序">⠿</span>
                 <!-- 状态/操作区 -->
                 <div class="flex flex-col items-center gap-1 pt-1">
                     {% if p['status'] == '待执行' %}
@@ -100,11 +104,7 @@
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 flex-wrap">
                         <span class="text-sm font-medium {% if p['status'] != '待执行' %}line-through text-muted{% else %}text-main{% endif %}">{{ p['name'] }}</span>
-                        <span class="text-xs px-1.5 py-0.5 rounded
-                            {% if p['category'] == '工作延续' %}priority-high
-                            {% elif p['category'] == '学习成长' %}status-todo
-                            {% elif p['category'] == '生活事项' %}priority-low
-                            {% else %}status-done{% endif %}">{{ p['category'] }}</span>
+                        <span class="cat-badge">{{ p['category'] }}</span>
                         <span class="text-xs px-1.5 py-0.5 rounded
                             {% if p['priority'] == '高' %}priority-high{% elif p['priority'] == '中' %}priority-mid{% else %}priority-low{% endif %}">{{ p['priority'] }}</span>
                         {% if p['estimated_time'] %}
@@ -168,11 +168,8 @@
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="form-label">分类</label>
-                    <select name="category" class="form-input">
-                        <option value="工作延续">工作延续</option>
-                        <option value="学习成长">学习成长</option>
-                        <option value="生活事项">生活事项</option>
-                        <option value="兴趣娱乐" selected>兴趣娱乐</option>
+                    <select name="category" id="plan-category-select" class="form-input">
+                        {% for c in plan_categories %}<option value="{{ c }}"{% if c == '兴趣娱乐' %} selected{% endif %}>{{ c }}</option>{% endfor %}
                     </select>
                 </div>
                 <div>
@@ -235,7 +232,24 @@
     </div>
 </div>
 
+<!-- 管理分类模态框（计划分类） -->
+<div id="modal-manage-cats" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg" id="manage-cats-title">管理分类</h3>
+            <button type="button" onclick="closeModal('modal-manage-cats')" class="modal-close-btn" aria-label="关闭">✕</button>
+        </div>
+        <p class="text-xs text-muted mb-3">添加或删除分类。删除后，相关计划会归入「未分类」。</p>
+        <div id="manage-cats-list" class="space-y-2 mb-3"></div>
+        <form id="manage-cats-add-form" class="flex gap-2">
+            <input type="text" id="manage-cats-input" class="form-input" placeholder="新分类名称" maxlength="20">
+            <button type="submit" class="btn btn-primary whitespace-nowrap">添加</button>
+        </form>
+    </div>
+</div>
+
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/sortable.min.js') }}"></script>
 <script>
 function deferPlan(id, name) {
     document.getElementById('defer-name').textContent = name;
@@ -247,6 +261,113 @@ function reschedulePlan(id, name) {
     document.getElementById('reschedule-name').textContent = name;
     document.getElementById('form-reschedule').action = '/evening-plan/' + id + '/reschedule';
     openModal('modal-reschedule');
+}
+
+// ===== 拖拽排序（今晚计划，按日期隔离） =====
+document.querySelectorAll('.plan-sortable').forEach(function (container) {
+    Sortable.create(container, {
+        handle: '[data-drag-handle]',
+        animation: 150,
+        ghostClass: 'dragging',
+        onEnd: function () {
+            var ids = Array.from(container.children)
+                .filter(function (el) { return el.dataset.id; })
+                .map(function (el) { return parseInt(el.dataset.id, 10); });
+            fetch('/api/evening-plan/reorder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: ids, date: container.dataset.date })
+            });
+        }
+    });
+});
+
+// ===== 自定义分类管理 =====
+var currentCatModule = '';
+function openManageCategories(module) {
+    currentCatModule = module;
+    document.getElementById('manage-cats-title').textContent =
+        (module === 'goals' ? '目标层级' : '计划分类') + '管理';
+    renderCategoryManager();
+    openModal('modal-manage-cats');
+}
+function renderCategoryManager() {
+    fetch('/api/categories?module=' + currentCatModule)
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            var list = document.getElementById('manage-cats-list');
+            list.innerHTML = '';
+            d.categories.forEach(function (name) {
+                var row = document.createElement('div');
+                row.className = 'flex items-center justify-between p-2 rounded-lg bg-hover';
+                var span = document.createElement('span');
+                span.textContent = name;
+                span.className = 'text-sm text-main';
+                var btn = document.createElement('button');
+                if (name === '未分类') {
+                    btn.textContent = '系统';
+                    btn.className = 'text-xs text-muted';
+                    btn.disabled = true;
+                } else {
+                    btn.textContent = '删除';
+                    btn.className = 'text-xs text-red-500 hover:underline';
+                    btn.onclick = function () { deleteCategory(name); };
+                }
+                row.appendChild(span);
+                row.appendChild(btn);
+                list.appendChild(row);
+            });
+        });
+}
+function deleteCategory(name) {
+    if (!confirm('确定删除分类「' + name + '」？相关计划会归入「未分类」。')) return;
+    fetch('/api/categories/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ module: currentCatModule, name: name })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+        if (d.ok) { renderCategoryManager(); refreshCategorySelects(); }
+        else { alert(d.error); }
+    });
+}
+document.getElementById('manage-cats-add-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var input = document.getElementById('manage-cats-input');
+    var name = input.value.trim();
+    if (!name) return;
+    fetch('/api/categories/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ module: currentCatModule, name: name })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+        if (d.ok) { input.value = ''; renderCategoryManager(); refreshCategorySelects(); }
+        else { alert(d.error); }
+    });
+});
+function refreshCategorySelects() {
+    fetch('/api/categories?module=goals').then(function (r) { return r.json(); }).then(function (d) {
+        rebuildSelect('goal-level-select', d.categories);
+        rebuildSelect('eg-level', d.categories);
+    });
+    fetch('/api/categories?module=evening_plan').then(function (r) { return r.json(); }).then(function (d) {
+        rebuildSelect('plan-category-select', d.categories);
+    });
+}
+function rebuildSelect(id, cats) {
+    var sel = document.getElementById(id);
+    if (!sel) return;
+    var cur = sel.value;
+    sel.innerHTML = '';
+    cats.forEach(function (c) {
+        var o = document.createElement('option');
+        o.value = c; o.textContent = c;
+        sel.appendChild(o);
+    });
+    if (cats.indexOf(cur) !== -1) sel.value = cur;
 }
 </script>
 {% endblock %}
