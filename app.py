@@ -33,7 +33,8 @@ def add_header(response):
             response.headers['Pragma'] = 'no-cache'
             response.headers['Expires'] = '0'
         else:
-            response.headers['Cache-Control'] = 'public, max-age=600'
+            # 静态资源缓存 1 天，减少页面切换时的重复下载（手机端提速明显）
+            response.headers['Cache-Control'] = 'public, max-age=86400'
     return response
 
 # 启动时初始化数据库
