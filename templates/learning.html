@@ -40,7 +40,7 @@
     <div class="modal-content">
         <div class="flex items-center justify-between mb-4">
             <h3 class="font-semibold text-lg">添加学习计划</h3>
-            <button onclick="closeModal('modal-learning')" class="text-muted hover:text-sub">✕</button>
+            <button type="button" onclick="closeModal('modal-learning')" class="modal-close-btn" aria-label="关闭">✕</button>
         </div>
         <form method="POST" action="{{ url_for('learning_add') }}" class="space-y-3">
             <div>
@@ -74,7 +74,7 @@
     <div class="modal-content">
         <div class="flex items-center justify-between mb-4">
             <h3 class="font-semibold text-lg">编辑学习计划</h3>
-            <button onclick="closeModal('modal-edit-learning')" class="text-muted hover:text-sub">✕</button>
+            <button type="button" onclick="closeModal('modal-edit-learning')" class="modal-close-btn" aria-label="关闭">✕</button>
         </div>
         <form id="form-edit-learning" method="POST" action="" class="space-y-3">
             <div>
