@@ -526,6 +526,38 @@ body {
     background: var(--sidebar-hover);
 }
 
+/* ========== 拖拽排序 ========== */
+.drag-handle {
+    cursor: grab;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 4px;
+    border-radius: 6px;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;          /* 触屏拖拽时避免页面滚动 */
+    flex-shrink: 0;
+}
+.drag-handle:active {
+    cursor: grabbing;
+    background: var(--sidebar-hover);
+}
+.dragging {
+    opacity: 0.5;
+    background: var(--primary-light) !important;
+}
+
+/* ========== 通用分类徽章 ========== */
+.cat-badge {
+    font-size: 0.7rem;
+    padding: 1px 6px;
+    border-radius: 9999px;
+    background: var(--tag-slate-bg);
+    color: var(--tag-slate-text);
+    white-space: nowrap;
+}
+
 /* ========== 日历格子 ========== */
 .cal-day {
     min-height: 90px;
