@@ -117,7 +117,7 @@
     <div class="modal-content">
         <div class="flex items-center justify-between mb-4">
             <h3 class="font-semibold text-lg">添加大额消费</h3>
-            <button onclick="closeModal('modal-expense')" class="text-muted hover:text-sub">✕</button>
+            <button type="button" onclick="closeModal('modal-expense')" class="modal-close-btn" aria-label="关闭">✕</button>
         </div>
         <form method="POST" action="{{ url_for('finance_expense_add') }}" class="space-y-3">
             <div>
@@ -160,7 +160,7 @@
     <div class="modal-content">
         <div class="flex items-center justify-between mb-4">
             <h3 class="font-semibold text-lg">添加消费决策</h3>
-            <button onclick="closeModal('modal-decision')" class="text-muted hover:text-sub">✕</button>
+            <button type="button" onclick="closeModal('modal-decision')" class="modal-close-btn" aria-label="关闭">✕</button>
         </div>
         <form method="POST" action="{{ url_for('finance_decision_add') }}" class="space-y-3">
             <div>
