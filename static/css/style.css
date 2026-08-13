@@ -532,20 +532,40 @@ body {
     color: var(--text-muted);
     font-size: 1.1rem;
     line-height: 1;
-    padding: 4px;
+    padding: 6px 8px;
     border-radius: 6px;
     user-select: none;
     -webkit-user-select: none;
     touch-action: none;          /* 触屏拖拽时避免页面滚动 */
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    min-height: 30px;
 }
 .drag-handle:active {
     cursor: grabbing;
     background: var(--sidebar-hover);
 }
+/* 拖拽时原位留下的占位（半透明） */
 .dragging {
     opacity: 0.5;
     background: var(--primary-light) !important;
+}
+/* 被选中（按下）的项：高亮边框 */
+.drag-chosen {
+    box-shadow: 0 0 0 2px var(--primary) !important;
+}
+/* 跟随手指移动的拖拽克隆：抬高层级避免与列表项重叠/被裁剪 */
+.drag-fallback {
+    opacity: 0.95 !important;
+    background: var(--card-bg, #ffffff) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28) !important;
+    z-index: 9999 !important;
+    transform: scale(1.02);
+    border-radius: 12px;
+    cursor: grabbing;
 }
 
 /* ========== 通用分类徽章 ========== */
