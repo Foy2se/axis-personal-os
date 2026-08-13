@@ -3,7 +3,8 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify, R
 from models import get_db, init_db, CONTENT_TABLES, get_categories, SYSTEM_CATEGORY
 from auth import (hash_password, verify_password, create_session, destroy_session,
                   get_current_user, login_required, get_user_id)
-from utils import (today_str, now_str, calculate_next_date, get_week_range,
+from utils import (today_str, now_str, now_local, safe_float, safe_int,
+                   calculate_next_date, get_week_range,
                    get_week_days, get_month_days, parse_advance_days,
                    generate_ics, get_stars, export_all_data, import_all_data,
                    export_csv_data, export_markdown_data, auto_backup,
@@ -35,6 +36,12 @@ def add_header(response):
         else:
             # 静态资源缓存 1 天，减少页面切换时的重复下载（手机端提速明显）
             response.headers['Cache-Control'] = 'public, max-age=86400'
+    else:
+        # HTML 页面：禁止缓存，确保用户操作后页面状态立即刷新
+        # （避免浏览器启发式缓存 GET 响应，导致"操作后看到旧页面/状态未更新"）
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
     return response
 
 # 启动时初始化数据库
@@ -58,7 +65,7 @@ def require_login():
 @app.context_processor
 def inject_globals():
     user = get_current_user()
-    return dict(active_page='', today=today_str(), current_user=user)
+    return dict(active_page='', today=today_str(), current_user=user, get_stars=get_stars)
 
 
 # ===================== 认证路由 =====================
@@ -156,7 +163,7 @@ def dashboard():
     uid = get_user_id()
     db = get_db()
     today = today_str()
-    now = datetime.now()
+    now = now_local()
 
     # AXIS 3.0: 自动迁移昨日未完成任务
     migrate_overdue_tasks(uid)
@@ -269,7 +276,7 @@ def daily_loop_complete():
     uid = get_user_id()
     phase = request.form.get('phase')
     today = today_str()
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = now_local().strftime('%Y-%m-%d %H:%M:%S')
     field_map = {
         'morning': ('morning_completed', 'morning_at'),
         'evening': ('evening_completed', 'evening_at'),
@@ -479,7 +486,7 @@ def task_update(tid):
     status = request.form.get('status')
     if status == '已完成':
         db.execute("UPDATE tasks SET status = ?, completed_at = ? WHERE id = ? AND user_id = ?",
-                   (status, datetime.now().isoformat(), tid, uid))
+                   (status, now_local().isoformat(), tid, uid))
     else:
         db.execute("UPDATE tasks SET status = ?, completed_at = NULL WHERE id = ? AND user_id = ?",
                    (status, tid, uid))
@@ -596,7 +603,7 @@ def work_log_save():
 
     # 标记 Evening Loop 完成（使用独立连接）
     update_daily_loop_state(uid, log_date, 'evening_completed', 1)
-    update_daily_loop_state(uid, log_date, 'evening_at', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    update_daily_loop_state(uid, log_date, 'evening_at', now_local().strftime('%Y-%m-%d %H:%M:%S'))
 
     # 保存工作日志后，引导用户规划今晚个人时间
     return redirect(url_for('evening_plan', from_context='worklog'))
@@ -642,7 +649,7 @@ def work_log_today():
 
     # 标记 Evening Loop 完成
     update_daily_loop_state(uid, log_date, 'evening_completed', 1)
-    update_daily_loop_state(uid, log_date, 'evening_at', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    update_daily_loop_state(uid, log_date, 'evening_at', now_local().strftime('%Y-%m-%d %H:%M:%S'))
 
     # 保存工作日志后，引导用户规划今晚个人时间
     return redirect(url_for('evening_plan', from_context='worklog'))
@@ -1083,7 +1090,7 @@ def monthly_plan():
     uid = get_user_id()
     db = get_db()
     # 默认显示当月
-    year_month = request.args.get('ym', datetime.now().strftime('%Y-%m'))
+    year_month = request.args.get('ym', now_local().strftime('%Y-%m'))
     plan = db.execute(
         "SELECT * FROM monthly_plans WHERE year_month = ? AND user_id = ?", (year_month, uid)
     ).fetchone()
@@ -1326,7 +1333,7 @@ def health_today():
 def finance():
     uid = get_user_id()
     db = get_db()
-    ym = request.args.get('ym', datetime.now().strftime('%Y-%m'))
+    ym = request.args.get('ym', now_local().strftime('%Y-%m'))
     monthly = db.execute(
         "SELECT * FROM finance_monthly WHERE year_month = ? AND user_id = ?", (ym, uid)
     ).fetchone()
@@ -1350,7 +1357,8 @@ def finance():
         expenses=expenses,
         decisions=decisions,
         year_month=ym,
-        all_months=all_months)
+        all_months=all_months,
+        get_stars=get_stars)
 
 
 @app.route('/finance/monthly/save', methods=['POST'])
@@ -1358,9 +1366,9 @@ def finance_monthly_save():
     uid = get_user_id()
     db = get_db()
     ym = request.form.get('year_month')
-    income = float(request.form.get('income', 0) or 0)
-    fixed = float(request.form.get('fixed_expense', 0) or 0)
-    free = float(request.form.get('free_amount', 0) or 0)
+    income = safe_float(request.form.get('income'))
+    fixed = safe_float(request.form.get('fixed_expense'))
+    free = safe_float(request.form.get('free_amount'))
     summary = request.form.get('summary', '')
 
     existing = db.execute("SELECT id FROM finance_monthly WHERE year_month = ? AND user_id = ?", (ym, uid)).fetchone()
@@ -1388,10 +1396,10 @@ def finance_expense_add():
         VALUES (?, ?, ?, ?, ?, ?, ?)""",
         (uid,
          request.form['item_name'],
-         float(request.form.get('amount', 0)),
+         safe_float(request.form.get('amount')),
          request.form.get('category', '生活'),
          request.form.get('reason', ''),
-         int(request.form.get('satisfaction', 0) or 0),
+         safe_int(request.form.get('satisfaction')),
          request.form.get('expense_date') or None)
     )
     db.commit()
@@ -1419,11 +1427,11 @@ def finance_decision_add():
         (uid,
          request.form['item_name'],
          request.form.get('reason', ''),
-         float(request.form.get('budget', 0) or 0),
+         safe_float(request.form.get('budget')),
          request.form.get('research', ''),
          request.form.get('decision', ''),
          request.form.get('result', ''),
-         int(request.form.get('satisfaction', 0) or 0))
+         safe_int(request.form.get('satisfaction')))
     )
     db.commit()
     db.close()
@@ -1666,7 +1674,7 @@ def archive_viewpoint_delete(vid):
 # ===================== 自动化提醒 =====================
 @app.route('/automation')
 def automation():
-    now = datetime.now()
+    now = now_local()
     current_hour = now.hour
     current_minute = now.minute
     current_time_val = current_hour * 60 + current_minute
@@ -1921,7 +1929,7 @@ def export_data():
     uid = get_user_id()
     data = export_all_data(uid)
     json_str = json.dumps(data, ensure_ascii=False, indent=2)
-    filename = f"personal_os_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    filename = f"personal_os_backup_{now_local().strftime('%Y%m%d_%H%M%S')}.json"
     return Response(
         json_str,
         mimetype='application/json',
@@ -1959,7 +1967,7 @@ def export_csv():
     """导出CSV格式（zip包）"""
     uid = get_user_id()
     buf = export_csv_data(uid)
-    filename = f"personal_os_csv_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+    filename = f"personal_os_csv_{now_local().strftime('%Y%m%d_%H%M%S')}.zip"
     return Response(
         buf.getvalue(),
         mimetype='application/zip',
@@ -1972,7 +1980,7 @@ def export_markdown():
     """导出Markdown格式（zip包）"""
     uid = get_user_id()
     buf = export_markdown_data(uid)
-    filename = f"personal_os_markdown_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+    filename = f"personal_os_markdown_{now_local().strftime('%Y%m%d_%H%M%S')}.zip"
     return Response(
         buf.getvalue(),
         mimetype='application/zip',
@@ -2092,7 +2100,7 @@ def evening_plan_complete(pid):
     db = get_db()
     db.execute(
         "UPDATE evening_plans SET status='已完成', completed_at=? WHERE id=? AND user_id=?",
-        (datetime.now().isoformat(), pid, uid)
+        (now_local().isoformat(), pid, uid)
     )
     db.commit()
     db.close()
