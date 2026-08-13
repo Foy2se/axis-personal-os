@@ -164,3 +164,57 @@ document.addEventListener('DOMContentLoaded', () => {
         setupStarRating(container.id, inputId);
     });
 });
+
+// ===================== 提交反馈 / 防止重复提交 =====================
+// 解决：操作无即时反馈、重复点击导致重复请求、操作后页面状态未及时刷新。
+// 仅在客户端做"提交中"提示与防重复，不改变任何后端逻辑与页面结构。
+(function () {
+    function showBusy() {
+        var el = document.getElementById('axis-busy');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'axis-busy';
+            el.setAttribute('role', 'status');
+            el.style.cssText = 'position:fixed;left:50%;top:14px;transform:translateX(-50%);' +
+                'z-index:9999;background:var(--primary,#6366f1);color:#fff;padding:8px 14px;' +
+                'border-radius:9999px;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.2);' +
+                'transition:opacity .15s;';
+            el.textContent = '⏳ 处理中…';
+            (document.body || document.documentElement).appendChild(el);
+        }
+        el.style.display = 'block';
+        el.style.opacity = '1';
+    }
+    function hideBusy() {
+        var el = document.getElementById('axis-busy');
+        if (el) el.style.display = 'none';
+    }
+
+    window.__axisSubmitting = false;
+
+    document.addEventListener('submit', function (e) {
+        if (window.__axisSubmitting) { e.preventDefault(); return; }
+        window.__axisSubmitting = true;
+        showBusy();
+        // 禁用提交按钮与自动提交的 select，给出即时反馈并防止重复请求
+        var btn = e.submitter || (e.target && e.target.querySelector('button[type="submit"]'));
+        if (btn && !btn.disabled) {
+            if (!btn.dataset.__orig) btn.dataset.__orig = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '处理中…';
+        }
+        var statusSel = e.target && e.target.querySelector('select[name="status"]');
+        if (statusSel) statusSel.disabled = true;
+        // 兜底：若 8 秒内未完成导航（如校验失败被拦截），恢复可操作
+        setTimeout(function () {
+            window.__axisSubmitting = false;
+            hideBusy();
+            if (btn) { btn.disabled = false; if (btn.dataset.__orig) btn.textContent = btn.dataset.__orig; }
+            if (statusSel) statusSel.disabled = false;
+        }, 8000);
+    }, true);
+
+    // 新页面已就绪即隐藏提示
+    window.addEventListener('DOMContentLoaded', hideBusy);
+    window.addEventListener('pageshow', hideBusy);
+})();
