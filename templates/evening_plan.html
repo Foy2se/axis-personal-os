@@ -269,6 +269,15 @@ document.querySelectorAll('.plan-sortable').forEach(function (container) {
         handle: '[data-drag-handle]',
         animation: 150,
         ghostClass: 'dragging',
+        chosenClass: 'drag-chosen',
+        dragClass: 'drag-fallback',
+        // 移动端关键：强制使用 DOM 拖拽克隆，避免原生拖拽在手机上错位/重叠、响应迟钝
+        fallback: true,
+        fallbackOnBody: true,
+        fallbackTolerance: 4,
+        touchStartThreshold: 4,
+        filter: 'button, input, a, select, textarea',
+        preventOnFilter: false,
         onEnd: function () {
             var ids = Array.from(container.children)
                 .filter(function (el) { return el.dataset.id; })
@@ -277,7 +286,7 @@ document.querySelectorAll('.plan-sortable').forEach(function (container) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ids: ids, date: container.dataset.date })
-            });
+            }).catch(function () {});
         }
     });
 });
