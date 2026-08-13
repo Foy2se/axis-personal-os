@@ -1,5 +1,5 @@
 """工具函数 - 日期计算、ICS生成、导出导入、自动备份"""
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 import calendar
 import os
 import io
@@ -8,12 +8,47 @@ import csv
 import zipfile
 
 
+# 用户本地时区：中国标准时间 (UTC+8)。
+# 所有"当前时间/日期"统一使用该偏移，避免部署在 UTC 服务器（如 PythonAnywhere）时
+# 时间比用户本地慢 8 小时（跨午夜时日期也会错位）。
+CHINA_TZ_OFFSET = timedelta(hours=8)
+
+
+def now_local():
+    """返回用户本地时间（中国 UTC+8）的 naive datetime。"""
+    return (datetime.now(timezone.utc) + CHINA_TZ_OFFSET).replace(tzinfo=None)
+
+
 def today_str():
-    return date.today().isoformat()
+    return now_local().date().isoformat()
 
 
 def now_str():
-    return datetime.now().strftime('%Y-%m-%d %H:%M')
+    return now_local().strftime('%Y-%m-%d %H:%M')
+
+
+def safe_float(value, default=0.0):
+    """安全地将表单值转为 float：兼容空字符串、'None'、逗号/空格分隔的数字。
+
+    用于金额等字段，避免 float('') / float('None') 触发 500。
+    """
+    if value is None:
+        return default
+    s = str(value).strip().replace(',', '').replace(' ', '')
+    if s == '' or s.lower() == 'none':
+        return default
+    try:
+        return float(s)
+    except (ValueError, TypeError):
+        return default
+
+
+def safe_int(value, default=0):
+    """安全地将表单值转为 int（先按 float 解析，兼容 '5' / '5.0' / 空值）。"""
+    try:
+        return int(safe_float(value, default))
+    except (ValueError, TypeError):
+        return default
 
 
 def calculate_next_date(last_done_str, cycle_num, cycle_unit):
@@ -96,7 +131,8 @@ def generate_ics():
     """
     # 直接使用 CRLF 作为行尾
     CRLF = '\r\n'
-    dtstamp = datetime.now().strftime('%Y%m%dT%H%M%SZ')
+    # ICS DTSTAMP 必须是 UTC（后缀 Z），与用户本地时区无关，使用显式 UTC 而非本地时间
+    dtstamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
 
     def make_event(uid, title, description, hour_start, minute_start,
                    hour_end, minute_end, freq, byday=None, interval=1,
@@ -231,7 +267,7 @@ def export_all_data(user_id=None):
     return {
         "version": "3.0",
         "user": user_info,
-        "exported_at": datetime.now().isoformat(),
+        "exported_at": now_local().isoformat(),
         "table_count": len(EXPORT_TABLES),
         "tables": data
     }
@@ -317,7 +353,7 @@ def export_markdown_data(user_id):
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
         # README 索引
         readme = "# Personal OS 数据导出\n\n"
-        readme += f"导出时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+        readme += f"导出时间: {now_local().strftime('%Y-%m-%d %H:%M')}\n\n"
         readme += "## 目录结构\n\n"
         readme += "- `notes/` - 思考笔记（按分类组织）\n"
         readme += "- `work_logs/` - 工作日志（按日期）\n"
@@ -539,7 +575,7 @@ def cleanup_old_backups(user_id, days=30):
     """清理过期备份"""
     from models import get_db
     db = get_db()
-    cutoff = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+    cutoff = (now_local() - timedelta(days=days)).strftime('%Y-%m-%d')
     old_backups = db.execute(
         "SELECT * FROM backups WHERE user_id = ? AND date(created_at) < ?",
         (user_id, cutoff)
@@ -626,7 +662,7 @@ def get_weather(city='Beijing', city_name='北京', user_id=None):
     from models import get_db
     db = get_db()
     today = today_str()
-    now = datetime.now()
+    now = now_local()
 
     # 检查缓存
     if user_id:
@@ -812,7 +848,7 @@ def update_daily_loop_state(user_id, loop_date, field, value):
 def get_current_loop_phase(user_id):
     """判断当前应显示的 loop 阶段：morning / evening / sleep / none"""
     from models import get_db
-    now = datetime.now()
+    now = now_local()
     hour = now.hour
     minute = now.minute
     settings = get_user_settings(user_id)
@@ -903,7 +939,7 @@ def generate_ai_insights(user_id):
         "SELECT * FROM goals WHERE user_id = ? AND status = '进行中' AND progress < 20 ORDER BY created_at DESC LIMIT 3",
         (user_id,)
     ).fetchall()
-    old_goals = [g for g in active_goals if g['created_at'] and g['created_at'] < (datetime.now() - timedelta(days=30)).isoformat()]
+    old_goals = [g for g in active_goals if g['created_at'] and g['created_at'] < (now_local() - timedelta(days=30)).isoformat()]
     if old_goals:
         names = '、'.join([g['name'] for g in old_goals[:2]])
         insights.append({
@@ -919,7 +955,7 @@ def generate_ai_insights(user_id):
         (user_id, today)
     ).fetchone()
     if not today_log:
-        now = datetime.now()
+        now = now_local()
         if now.hour >= 18:
             insights.append({
                 'type': 'work',
@@ -1057,7 +1093,7 @@ def summarize_work_log(completed, problems, thoughts):
 
 def get_greeting_by_time():
     """根据当前时间返回问候语"""
-    hour = datetime.now().hour
+    hour = now_local().hour
     if hour < 6:
         return '夜深了', 'Good Night'
     elif hour < 11:
